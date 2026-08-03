@@ -22,8 +22,9 @@ async function shot(page, name, options = {}) {
   await page.screenshot({ path: path.join(output, name), animations: "disabled", ...options });
 }
 
+const previewQuery = "?telegram=1&shared=1";
 const desktop = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
-await desktop.goto(`${base}/?telegram=1`, { waitUntil: "networkidle" });
+await desktop.goto(`${base}/${previewQuery}`, { waitUntil: "networkidle" });
 await settle(desktop);
 await shot(desktop, "01-cover-desktop.png", { fullPage: false });
 
@@ -44,14 +45,19 @@ for (const [id, name] of [
   await section.screenshot({ path: path.join(output, name), animations: "disabled" });
 }
 
+const sharedAlbum = desktop.locator("#shared-album");
+await sharedAlbum.scrollIntoViewIfNeeded();
+await desktop.waitForTimeout(180);
+await sharedAlbum.screenshot({ path: path.join(output, "08-shared-album.png"), animations: "disabled" });
+
 const censoredFrame = desktop.locator(".image-frame.is-censored").first();
 await censoredFrame.scrollIntoViewIfNeeded();
 await censoredFrame.evaluate((element) => element.closest("button")?.click());
 await desktop.locator("#lightbox-censor").waitFor({ state: "visible" });
-await shot(desktop, "08-censorship-warning.png", { fullPage: false });
+await shot(desktop, "09-censorship-warning.png", { fullPage: false });
 await desktop.locator("#lightbox-censor-show").click();
 await desktop.waitForTimeout(120);
-await shot(desktop, "09-censorship-revealed.png", { fullPage: false });
+await shot(desktop, "10-censorship-revealed.png", { fullPage: false });
 await desktop.locator("#lightbox-close").click();
 
 const censorshipButton = desktop.locator(".reader-tools__button--censor");
@@ -60,19 +66,22 @@ await desktop.waitForLoadState("networkidle");
 await desktop.locator("#open-book").click();
 await desktop.locator("#ordinary-days").scrollIntoViewIfNeeded();
 await desktop.waitForTimeout(250);
-await shot(desktop, "10-global-censorship-off.png", { fullPage: false });
+await shot(desktop, "11-global-censorship-off.png", { fullPage: false });
 
 const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
-await mobile.goto(`${base}/?telegram=1`, { waitUntil: "networkidle" });
+await mobile.goto(`${base}/${previewQuery}`, { waitUntil: "networkidle" });
 await settle(mobile);
-await shot(mobile, "11-cover-mobile.png", { fullPage: false });
+await shot(mobile, "12-cover-mobile.png", { fullPage: false });
 await mobile.locator("#open-book").click();
 await mobile.locator("#ordinary-days").scrollIntoViewIfNeeded();
 await mobile.waitForTimeout(220);
-await shot(mobile, "12-event-mobile.png", { fullPage: false });
+await shot(mobile, "13-event-mobile.png", { fullPage: false });
 await mobile.locator("#telegram").scrollIntoViewIfNeeded();
 await mobile.waitForTimeout(180);
-await shot(mobile, "13-telegram-mobile.png", { fullPage: false });
+await shot(mobile, "14-telegram-mobile.png", { fullPage: false });
+await mobile.locator("#shared-album").scrollIntoViewIfNeeded();
+await mobile.waitForTimeout(180);
+await shot(mobile, "15-shared-album-mobile.png", { fullPage: false });
 
 const studio = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
 await studio.goto(`${base}/tools/studio.html`, { waitUntil: "networkidle" });
@@ -87,7 +96,7 @@ await studio.evaluate(() => {
 });
 await populatedChapter.scrollIntoViewIfNeeded();
 await studio.waitForTimeout(350);
-await shot(studio, "14-memory-studio.png", { fullPage: false });
+await shot(studio, "16-memory-studio.png", { fullPage: false });
 
 await browser.close();
 
