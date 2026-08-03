@@ -108,6 +108,15 @@ await expandButton.click();
 await studio.waitForTimeout(100);
 await shot(studio, "18-memory-studio-expanded-caption.png", { fullPage: false });
 
+const singleEvent = desktop.locator("#ordinary-days .memory-block--event").first();
+await singleEvent.scrollIntoViewIfNeeded();
+await desktop.waitForTimeout(120);
+await singleEvent.screenshot({ path: path.join(output, "19-single-row-event.png"), animations: "disabled" });
+const eightEvent = desktop.locator("#journeys .memory-block--event").first();
+await eightEvent.scrollIntoViewIfNeeded();
+await desktop.waitForTimeout(120);
+await eightEvent.screenshot({ path: path.join(output, "20-eight-item-event.png"), animations: "disabled" });
+
 await browser.close();
 
 const files = (await fs.readdir(output)).sort();

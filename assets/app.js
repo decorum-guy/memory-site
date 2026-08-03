@@ -111,9 +111,11 @@
 
   function renderEventBlock(wrapper, block, uniqueId) {
     const items = (block.items || []).map(normalizeMedia);
-    const layout = block.layout || (items.length > 8 ? "stack" : "collage");
+    const layout = block.layout === "stack" && items.length > 8 ? "stack" : "collage";
     const previewItems = items.filter((item) => item.kind !== "audio").slice(0, layout === "stack" ? 5 : 8);
+    const rowCount = layout === "stack" ? 0 : (previewItems.length <= 4 ? 1 : 2);
     wrapper.classList.add(`event-layout-${safeClass(layout)}`, `event-count-${Math.min(items.length, 8)}`);
+    if (rowCount) wrapper.classList.add(`event-rows-${rowCount}`);
     wrapper.innerHTML = `
       <header class="event-heading">
         <div>
@@ -145,7 +147,7 @@
     });
     const count = document.createElement("span");
     count.className = "event-preview__count";
-    count.textContent = `${items.length} файлов`;
+    count.textContent = `${items.length} ${plural(items.length, "файл", "файла", "файлов")}`;
     preview.appendChild(count);
     wrapper.querySelector(".event-open").addEventListener("click", () => openGallery(items, 0));
     return wrapper;

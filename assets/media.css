@@ -248,3 +248,21 @@
   color: #f2e7d5;
   font: 400 1.02rem/1.5 var(--hand);
 }
+
+
+/* Отдельный layout-коммит: один ряд компактнее; максимум два ряда, затем стопка. */
+.event-rows-1 .event-preview {
+  min-height: clamp(19rem, 34vw, 28rem);
+}
+.event-rows-1 .event-preview::before { inset: 8% 5% 5%; }
+.event-rows-2 .event-preview {
+  min-height: clamp(34rem, 52vw, 41rem);
+}
+.event-layout-stack .event-preview {
+  min-height: clamp(28rem, 46vw, 38rem);
+}
+@media (max-width: 760px) {
+  .event-rows-1 .event-preview { min-height: 15.5rem; }
+  .event-rows-2 .event-preview { min-height: 31rem; }
+  .event-layout-stack .event-preview { min-height: 27rem; }
+}

@@ -463,7 +463,7 @@ def build_book(events: list[Event]) -> dict[str, Any]:
             blocks.append({
                 "type": "event", "id": f"event-{year}-{event_index + 1:03d}", "title": format_event_title(event),
                 "caption": "Добавь сюда одну короткую деталь об этом дне.", "date": event.start.isoformat(timespec="minutes"),
-                "layout": "stack" if len(event.items) > 7 else "collage", "items": [media_to_dict(item) for item in event.items],
+                "layout": "stack" if len(event.items) > 8 else "collage", "items": [media_to_dict(item) for item in event.items],
             })
         chapters.append({
             "id": f"year-{year}", "number": f"{chapter_index + 1:02d}", "kicker": "Глава по времени", "title": str(year),
