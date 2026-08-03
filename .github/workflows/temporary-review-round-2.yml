@@ -1,0 +1,42 @@
+name: Temporary review round 2 patch
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "preview/trigger-review-round-2.txt"
+      - "tools/review_round_2_patch.py"
+      - ".github/workflows/temporary-review-round-2.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout review branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Apply functional and Studio fixes
+        run: |
+          python3 tools/review_round_2_patch.py core
+          git add index.html assets/app.js assets/media.css tools/studio.html tools/import_memories.py preview/capture.mjs REVIEW_ROUND_2_CHECKLIST.md
+          git commit -m "fix: polish censorship captions and Memory Studio"
+
+      - name: Apply isolated event layout changes
+        run: |
+          python3 tools/review_round_2_patch.py layout
+          git add assets/app.js assets/media.css tools/import_memories.py preview/demo_memories.js preview/capture.mjs
+          git commit -m "fix(layout): compact event heights and safe row geometry"
+
+      - name: Push both commits
+        run: git push origin "HEAD:${GITHUB_HEAD_REF}"
