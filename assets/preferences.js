@@ -26,6 +26,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
+    renderSharedAlbum();
     if (settings.readerControlsEnabled === false) return;
 
     const controls = document.createElement("aside");
@@ -62,6 +63,56 @@
     controls.append(censorButton, topButton);
     document.body.appendChild(controls);
   });
+
+  function renderSharedAlbum() {
+    const previewMode = params.get("shared") === "1";
+    const enabled = previewMode || settings.sharedAlbumEnabled === true;
+    const url = String(settings.sharedAlbumUrl || (previewMode ? "https://www.icloud.com/sharedalbum/#demo-memory" : "")).trim();
+    if (!enabled || !url) return;
+
+    const mount = document.getElementById("shared-album");
+    if (!mount) return;
+
+    const qr = previewMode
+      ? "preview/demo-media/shared-album-qr.png"
+      : String(settings.sharedAlbumQr || "media/shared-album-qr.png");
+    const title = settings.sharedAlbumTitle || "Все фотографии и видео — ещё и в Shared Album";
+    const text = settings.sharedAlbumText || "Открой альбом на телефоне или компьютере.";
+
+    mount.hidden = false;
+    mount.innerHTML = `
+      <article class="shared-album-card">
+        <span class="shared-album-card__tape" aria-hidden="true"></span>
+        <div class="shared-album-card__copy">
+          <p class="shared-album-card__eyebrow">Запасной путь к воспоминаниям</p>
+          <h2>${escapeHtml(title)}</h2>
+          <p>${escapeHtml(text)}</p>
+          <a class="shared-album-card__button" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">Открыть Shared Album <span aria-hidden="true">↗</span></a>
+          <a class="shared-album-card__url" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>
+          <button class="shared-album-card__copy-button" type="button">Скопировать ссылку</button>
+        </div>
+        <a class="shared-album-card__qr" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer" aria-label="Открыть Shared Album по QR-коду">
+          <img src="${escapeAttr(qr)}" alt="QR-код Shared Album" />
+          <span>Наведи камеру</span>
+        </a>
+      </article>`;
+
+    const copyButton = mount.querySelector(".shared-album-card__copy-button");
+    copyButton.addEventListener("click", async function () {
+      const copied = await copyText(url);
+      copyButton.textContent = copied ? "Ссылка скопирована" : "Выдели ссылку выше";
+      window.setTimeout(() => { copyButton.textContent = "Скопировать ссылку"; }, 2200);
+    });
+  }
+
+  async function copyText(value) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   function countCensored(value) {
     let count = 0;
@@ -104,5 +155,13 @@
 
   function prefersReducedMotion() {
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+
+  function escapeAttr(value) {
+    return escapeHtml(value).replace(/`/g, "&#096;");
   }
 })();
