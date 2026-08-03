@@ -77,6 +77,16 @@ await shot(mobile, "13-telegram-mobile.png", { fullPage: false });
 const studio = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
 await studio.goto(`${base}/tools/studio.html`, { waitUntil: "networkidle" });
 await settle(studio);
+const populatedChapter = studio.locator("details.chapter").nth(1);
+await populatedChapter.evaluate((element) => { element.open = true; });
+await studio.evaluate(() => {
+  document.querySelectorAll(".item-preview img").forEach((image) => {
+    const source = image.getAttribute("src");
+    if (source && !/^(?:https?:|data:|blob:|\/|\.\.\/)/.test(source)) image.setAttribute("src", `../${source}`);
+  });
+});
+await populatedChapter.scrollIntoViewIfNeeded();
+await studio.waitForTimeout(350);
 await shot(studio, "14-memory-studio.png", { fullPage: false });
 
 await browser.close();
