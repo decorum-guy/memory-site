@@ -26,7 +26,9 @@
 
 ![Стопка события](screenshots/05-chapter-stack.png)
 
-### Опциональная Telegram-глава
+### Большая опциональная Telegram-глава
+
+Здесь одновременно проверяются обычные скриншоты, несколько scrapbook-разворотов и прозрачные PNG-вырезки без белого фона.
 
 ![Telegram-глава](screenshots/06-chapter-telegram.png)
 
@@ -34,31 +36,39 @@
 
 ![Финальная глава](screenshots/07-chapter-ending.png)
 
+## Shared Album
+
+Финальная вклейка содержит настоящий тестовый QR, прямую ссылку и кнопку копирования.
+
+![Shared Album desktop](screenshots/08-shared-album.png)
+
 ## Цензура
 
 ### Предупреждение
 
-![Предупреждение цензуры](screenshots/08-censorship-warning.png)
+![Предупреждение цензуры](screenshots/09-censorship-warning.png)
 
 ### После ручного подтверждения
 
-![Открытый скрытый материал](screenshots/09-censorship-revealed.png)
+![Открытый скрытый материал](screenshots/10-censorship-revealed.png)
 
 ### Общий переключатель выключил всю цензуру
 
-![Цензура выключена глобально](screenshots/10-global-censorship-off.png)
+![Цензура выключена глобально](screenshots/11-global-censorship-off.png)
 
 ## Мобильная версия
 
-![Мобильная обложка](screenshots/11-cover-mobile.png)
+![Мобильная обложка](screenshots/12-cover-mobile.png)
 
-![Мобильное событие](screenshots/12-event-mobile.png)
+![Мобильное событие](screenshots/13-event-mobile.png)
 
-![Telegram на телефоне](screenshots/13-telegram-mobile.png)
+![Telegram на телефоне](screenshots/14-telegram-mobile.png)
+
+![Shared Album на телефоне](screenshots/15-shared-album-mobile.png)
 
 ## Memory Studio
 
-![Редактор после автоматического импорта](screenshots/14-memory-studio.png)
+![Редактор после автоматического импорта](screenshots/16-memory-studio.png)
 
 ## Статус последней генерации
 
