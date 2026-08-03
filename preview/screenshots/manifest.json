@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-03T22:25:42.547Z",
+  "generatedAt": "2026-08-03T22:39:21.120Z",
   "files": [
     "01-cover-desktop.png",
     "02-book-full-desktop.png",
@@ -8,12 +8,14 @@
     "05-chapter-stack.png",
     "06-chapter-telegram.png",
     "07-chapter-ending.png",
-    "08-censorship-warning.png",
-    "09-censorship-revealed.png",
-    "10-global-censorship-off.png",
-    "11-cover-mobile.png",
-    "12-event-mobile.png",
-    "13-telegram-mobile.png",
-    "14-memory-studio.png"
+    "08-shared-album.png",
+    "09-censorship-warning.png",
+    "10-censorship-revealed.png",
+    "11-global-censorship-off.png",
+    "12-cover-mobile.png",
+    "13-event-mobile.png",
+    "14-telegram-mobile.png",
+    "15-shared-album-mobile.png",
+    "16-memory-studio.png"
   ]
 }
