@@ -3,26 +3,28 @@
 
   const data = window.MEMORY_BOOK;
   if (!data || !Array.isArray(data.chapters)) {
-    document.body.innerHTML = '<div class="fatal-error">Не найден файл content/memories.js или в нём есть ошибка.</div>';
+    document.body.innerHTML = '<div class="fatal-error">Не найден content/memories.js или в нём есть ошибка.</div>';
     return;
   }
 
-  const book = document.getElementById("memory-book");
-  const rail = document.getElementById("chapter-rail");
-  const openBookButton = document.getElementById("open-book");
-  const footer = document.getElementById("book-footer");
-
-  const lightbox = document.getElementById("lightbox");
-  const lightboxImage = document.getElementById("lightbox-image");
-  const lightboxCaption = document.getElementById("lightbox-caption");
-  const lightboxCounter = document.getElementById("lightbox-counter");
-  const lightboxClose = document.getElementById("lightbox-close");
-  const lightboxPrev = document.getElementById("lightbox-prev");
-  const lightboxNext = document.getElementById("lightbox-next");
+  const book = byId("memory-book");
+  const rail = byId("chapter-rail");
+  const openBookButton = byId("open-book");
+  const footer = byId("book-footer");
+  const lightbox = byId("lightbox");
+  const lightboxImage = byId("lightbox-image");
+  const lightboxVideo = byId("lightbox-video");
+  const lightboxLive = byId("lightbox-live");
+  const lightboxCaption = byId("lightbox-caption");
+  const lightboxCounter = byId("lightbox-counter");
+  const lightboxClose = byId("lightbox-close");
+  const lightboxPrev = byId("lightbox-prev");
+  const lightboxNext = byId("lightbox-next");
 
   let activeGallery = [];
   let activeIndex = 0;
   let previousFocus = null;
+  let livePlaying = false;
 
   applyMeta();
   renderBook();
@@ -30,20 +32,22 @@
   bindNavigation();
   observeChapters();
 
+  function byId(id) { return document.getElementById(id); }
+
   function applyMeta() {
     const meta = data.meta || {};
     setText("cover-eyebrow", meta.eyebrow);
     setText("cover-title", meta.title);
     setText("cover-subtitle", meta.subtitle);
     setText("cover-note", meta.note);
-    if (meta.footer) footer.querySelector("p").textContent = meta.footer;
+    if (meta.footer && footer) footer.querySelector("p").textContent = meta.footer;
     if (meta.accent) document.documentElement.style.setProperty("--accent", meta.accent);
     if (meta.title) document.title = meta.title;
   }
 
   function setText(id, value) {
     if (!value) return;
-    const element = document.getElementById(id);
+    const element = byId(id);
     if (element) element.textContent = value;
   }
 
@@ -54,7 +58,6 @@
       section.className = `memory-page memory-page--${safeClass(chapter.layout || "story")} theme-${safeClass(chapter.theme || "paper")}`;
       section.id = chapter.id || `chapter-${chapterIndex + 1}`;
       section.dataset.chapterIndex = String(chapterIndex);
-
       section.innerHTML = `
         <div class="page-binding" aria-hidden="true"><span></span><span></span><span></span></div>
         <div class="page-shadow" aria-hidden="true"></div>
@@ -69,12 +72,10 @@
         <div class="chapter-content"></div>
         <p class="page-number">${pad(chapterIndex + 1)}</p>
       `;
-
       const content = section.querySelector(".chapter-content");
       (chapter.blocks || []).forEach((block, blockIndex) => {
         content.appendChild(renderBlock(block, `${section.id}-${blockIndex}`));
       });
-
       fragment.appendChild(section);
     });
     book.appendChild(fragment);
@@ -88,6 +89,7 @@
     if (block.align) wrapper.dataset.align = block.align;
 
     switch (block.type) {
+      case "event": return renderEventBlock(wrapper, block, uniqueId);
       case "photo": return renderPhotoBlock(wrapper, block, uniqueId);
       case "stack": return renderStackBlock(wrapper, block, uniqueId);
       case "collage": return renderCollageBlock(wrapper, block, uniqueId);
@@ -102,7 +104,41 @@
     }
   }
 
+  function renderEventBlock(wrapper, block, uniqueId) {
+    const items = (block.items || []).map(normalizeMedia);
+    const previewItems = items.filter((item) => item.kind !== "audio").slice(0, block.layout === "stack" ? 5 : 7);
+    wrapper.classList.add(`event-layout-${safeClass(block.layout || "collage")}`);
+    wrapper.innerHTML = `
+      <header class="event-heading">
+        <div>
+          <p class="event-heading__date">${escapeHtml(block.title || formatDate(block.date))}</p>
+          ${renderCaption(block.caption || "", block.captionStyle || "scribble", uniqueId)}
+        </div>
+        <button class="event-open" type="button">Открыть ${items.length} ${plural(items.length, "момент", "момента", "моментов")}</button>
+      </header>
+      <div class="event-preview" aria-label="Предпросмотр события"></div>
+    `;
+    const preview = wrapper.querySelector(".event-preview");
+    previewItems.forEach((item, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `event-preview__item event-preview__item--${(index % 7) + 1}`;
+      button.style.setProperty("--event-rotate", `${[-5, 3, -2, 6, -4, 2, -1][index % 7]}deg`);
+      button.setAttribute("aria-label", `Открыть элемент ${index + 1}`);
+      button.appendChild(createMediaPreview(item));
+      button.addEventListener("click", () => openGallery(items, items.indexOf(item)));
+      preview.appendChild(button);
+    });
+    const count = document.createElement("span");
+    count.className = "event-preview__count";
+    count.textContent = `${items.length} файлов`;
+    preview.appendChild(count);
+    wrapper.querySelector(".event-open").addEventListener("click", () => openGallery(items, 0));
+    return wrapper;
+  }
+
   function renderPhotoBlock(wrapper, block, uniqueId) {
+    const photo = normalizeMedia({ ...block, kind: block.liveVideo ? "live" : "photo" });
     wrapper.innerHTML = `
       <figure class="polaroid tape-${safeClass(block.tape || "cream")}">
         <button class="photo-button" type="button" aria-label="Открыть фотографию крупно"></button>
@@ -113,13 +149,13 @@
       </figure>
     `;
     const button = wrapper.querySelector(".photo-button");
-    button.appendChild(createImage(block));
-    button.addEventListener("click", () => openGallery([normalizePhoto(block)], 0));
+    button.appendChild(createMediaPreview(photo));
+    button.addEventListener("click", () => openGallery([photo], 0));
     return wrapper;
   }
 
   function renderStackBlock(wrapper, block, uniqueId) {
-    const photos = (block.photos || []).map(normalizePhoto);
+    const photos = (block.photos || []).map((photo) => normalizeMedia({ ...photo, kind: photo.liveVideo ? "live" : "photo" }));
     wrapper.innerHTML = `
       <div class="stack-copy">
         ${block.title ? `<h3>${escapeHtml(block.title)}</h3>` : ""}
@@ -135,7 +171,7 @@
       button.style.setProperty("--stack-index", String(index));
       button.style.setProperty("--stack-rotate", `${stackRotation(index)}deg`);
       button.setAttribute("aria-label", `Открыть фотографию ${index + 1} из ${photos.length}`);
-      button.appendChild(createImage(photo));
+      button.appendChild(createMediaPreview(photo));
       button.addEventListener("click", () => openGallery(photos, index));
       stack.appendChild(button);
     });
@@ -147,7 +183,7 @@
   }
 
   function renderCollageBlock(wrapper, block, uniqueId) {
-    const photos = (block.photos || []).map(normalizePhoto);
+    const photos = (block.photos || []).map((photo) => normalizeMedia({ ...photo, kind: photo.liveVideo ? "live" : "photo" }));
     wrapper.innerHTML = `
       <header class="collage-heading">
         ${block.title ? `<h3>${escapeHtml(block.title)}</h3>` : ""}
@@ -161,7 +197,7 @@
       button.type = "button";
       button.className = `scrap-collage__item scrap-collage__item--${(index % 7) + 1}`;
       button.setAttribute("aria-label", `Открыть фотографию ${index + 1}`);
-      button.appendChild(createImage(photo));
+      button.appendChild(createMediaPreview(photo));
       button.addEventListener("click", () => openGallery(photos, index));
       collage.appendChild(button);
     });
@@ -184,8 +220,7 @@
         </figcaption>
       </figure>
     `;
-    const video = wrapper.querySelector("video");
-    video.addEventListener("error", () => wrapper.classList.add("is-missing"));
+    wrapper.querySelector("video").addEventListener("error", () => wrapper.classList.add("is-missing"));
     return wrapper;
   }
 
@@ -204,13 +239,7 @@
   }
 
   function renderQuoteBlock(wrapper, block) {
-    wrapper.innerHTML = `
-      <blockquote class="memory-quote">
-        <span aria-hidden="true">“</span>
-        <p>${escapeHtml(block.text || "")}</p>
-        ${block.author ? `<cite>${escapeHtml(block.author)}</cite>` : ""}
-      </blockquote>
-    `;
+    wrapper.innerHTML = `<blockquote class="memory-quote"><span aria-hidden="true">“</span><p>${escapeHtml(block.text || "")}</p>${block.author ? `<cite>${escapeHtml(block.author)}</cite>` : ""}</blockquote>`;
     return wrapper;
   }
 
@@ -226,13 +255,7 @@
 
   function renderLetterBlock(wrapper, block) {
     const paragraphs = Array.isArray(block.text) ? block.text : [block.text || ""];
-    wrapper.innerHTML = `
-      <div class="letter-sheet">
-        ${block.title ? `<h3>${escapeHtml(block.title)}</h3>` : ""}
-        ${paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("")}
-        ${block.signature ? `<div class="letter-signature">${escapeHtml(block.signature)}</div>` : ""}
-      </div>
-    `;
+    wrapper.innerHTML = `<div class="letter-sheet">${block.title ? `<h3>${escapeHtml(block.title)}</h3>` : ""}${paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join("")}${block.signature ? `<div class="letter-signature">${escapeHtml(block.signature)}</div>` : ""}</div>`;
     return wrapper;
   }
 
@@ -245,34 +268,37 @@
     if (!text) return "";
     if (style === "curve") {
       const pathId = `curve-${uniqueId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
-      return `
-        <svg class="caption-curve" viewBox="0 0 520 110" role="img" aria-label="${escapeAttr(text)}">
-          <defs><path id="${pathId}" d="M 18 78 Q 260 8 502 72" /></defs>
-          <text><textPath href="#${pathId}" startOffset="50%" text-anchor="middle">${escapeHtml(text)}</textPath></text>
-        </svg>
-      `;
+      return `<svg class="caption-curve" viewBox="0 0 520 110" role="img" aria-label="${escapeAttr(text)}"><defs><path id="${pathId}" d="M 18 78 Q 260 8 502 72" /></defs><text><textPath href="#${pathId}" startOffset="50%" text-anchor="middle">${escapeHtml(text)}</textPath></text></svg>`;
     }
     return `<p class="hand-caption hand-caption--${safeClass(style || "scribble")}">${escapeHtml(text)}</p>`;
   }
 
-  function createImage(photo) {
+  function createMediaPreview(item) {
     const frame = document.createElement("span");
-    frame.className = "image-frame";
-
+    frame.className = `image-frame media-kind-${safeClass(item.kind)}`;
     const image = document.createElement("img");
-    image.src = photo.src || "";
-    image.alt = photo.alt || "Фотография из воспоминаний";
+    image.src = item.thumb || item.poster || item.src || "";
+    image.alt = item.alt || (item.kind === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний");
     image.loading = "lazy";
     image.decoding = "async";
-
     const placeholder = document.createElement("span");
     placeholder.className = "image-placeholder";
-    placeholder.innerHTML = `<span>замени на своё фото</span><small>${escapeHtml(photo.src || "media/photos/photo.jpg")}</small>`;
-
+    placeholder.innerHTML = `<span>файл не найден</span><small>${escapeHtml(item.src || "")}</small>`;
     image.addEventListener("error", () => frame.classList.add("is-missing"));
     image.addEventListener("load", () => frame.classList.remove("is-missing"));
-
     frame.append(image, placeholder);
+
+    if (item.kind === "live") {
+      const badge = document.createElement("span");
+      badge.className = "media-badge media-badge--live";
+      badge.textContent = "LIVE";
+      frame.appendChild(badge);
+    } else if (item.kind === "video") {
+      const badge = document.createElement("span");
+      badge.className = "media-badge media-badge--video";
+      badge.textContent = "▶";
+      frame.appendChild(badge);
+    }
     return frame;
   }
 
@@ -307,22 +333,26 @@
     lightboxClose.addEventListener("click", closeGallery);
     lightboxPrev.addEventListener("click", () => moveGallery(-1));
     lightboxNext.addEventListener("click", () => moveGallery(1));
-    lightbox.addEventListener("click", (event) => {
-      if (event.target === lightbox) closeGallery();
-    });
-
+    lightboxLive.addEventListener("click", toggleLive);
+    lightbox.addEventListener("click", (event) => { if (event.target === lightbox) closeGallery(); });
     document.addEventListener("keydown", (event) => {
       if (lightbox.hidden) return;
       if (event.key === "Escape") closeGallery();
       if (event.key === "ArrowLeft") moveGallery(-1);
       if (event.key === "ArrowRight") moveGallery(1);
+      if (event.key === " ") {
+        const current = activeGallery[activeIndex];
+        if (current && current.kind === "live") {
+          event.preventDefault();
+          toggleLive();
+        }
+      }
     });
   }
 
   function observeChapters() {
     const sections = [...book.querySelectorAll(".memory-page")];
     const links = [...rail.querySelectorAll("a")];
-
     if (!("IntersectionObserver" in window)) return;
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
@@ -330,14 +360,13 @@
         links.forEach((link) => link.classList.toggle("is-active", link.getAttribute("href") === `#${entry.target.id}`));
       });
     }, { rootMargin: "-25% 0px -60% 0px", threshold: 0.01 });
-
     sections.forEach((section) => observer.observe(section));
   }
 
-  function openGallery(photos, index) {
-    if (!photos.length) return;
-    activeGallery = photos;
-    activeIndex = Math.max(0, Math.min(index, photos.length - 1));
+  function openGallery(items, index) {
+    if (!items.length) return;
+    activeGallery = items;
+    activeIndex = Math.max(0, Math.min(index, items.length - 1));
     previousFocus = document.activeElement;
     updateLightbox();
     lightbox.hidden = false;
@@ -346,9 +375,11 @@
   }
 
   function closeGallery() {
+    stopMedia();
     lightbox.hidden = true;
     document.body.classList.remove("lightbox-open");
     lightboxImage.removeAttribute("src");
+    lightboxVideo.removeAttribute("src");
     if (previousFocus && typeof previousFocus.focus === "function") previousFocus.focus();
   }
 
@@ -359,41 +390,101 @@
   }
 
   function updateLightbox() {
-    const photo = activeGallery[activeIndex];
-    lightboxImage.src = photo.src || "";
-    lightboxImage.alt = photo.alt || "Фотография";
-    lightboxCaption.textContent = photo.caption || photo.alt || "";
+    stopMedia();
+    const item = activeGallery[activeIndex];
+    lightboxCaption.textContent = item.caption || item.alt || "";
     lightboxCounter.textContent = `${activeIndex + 1} / ${activeGallery.length}`;
     const multi = activeGallery.length > 1;
     lightboxPrev.hidden = !multi;
     lightboxNext.hidden = !multi;
+    lightbox.classList.toggle("is-video", item.kind === "video");
+    lightbox.classList.toggle("is-live", item.kind === "live");
+
+    if (item.kind === "video") {
+      lightboxImage.hidden = true;
+      lightboxVideo.hidden = false;
+      lightboxVideo.poster = item.poster || "";
+      lightboxVideo.controls = true;
+      lightboxVideo.muted = false;
+      lightboxVideo.loop = false;
+      lightboxVideo.src = item.src || "";
+      lightboxLive.hidden = true;
+    } else {
+      lightboxVideo.hidden = true;
+      lightboxImage.hidden = false;
+      lightboxImage.src = item.src || "";
+      lightboxImage.alt = item.alt || "Фотография";
+      lightboxLive.hidden = item.kind !== "live" || !item.liveVideo;
+      lightboxLive.textContent = "▶ Оживить фото";
+    }
   }
 
-  function normalizePhoto(photo) {
+  function toggleLive() {
+    const item = activeGallery[activeIndex];
+    if (!item || item.kind !== "live" || !item.liveVideo) return;
+    if (livePlaying) {
+      stopMedia();
+      lightboxImage.hidden = false;
+      lightboxVideo.hidden = true;
+      lightboxLive.textContent = "▶ Оживить фото";
+      return;
+    }
+    livePlaying = true;
+    lightboxImage.hidden = true;
+    lightboxVideo.hidden = false;
+    lightboxVideo.controls = false;
+    lightboxVideo.muted = true;
+    lightboxVideo.loop = true;
+    lightboxVideo.poster = item.src || "";
+    lightboxVideo.src = item.liveVideo;
+    lightboxVideo.play().catch(() => {
+      lightboxVideo.controls = true;
+      lightboxLive.textContent = "Нажми Play";
+    });
+    lightboxLive.textContent = "■ Остановить";
+  }
+
+  function stopMedia() {
+    livePlaying = false;
+    lightboxVideo.pause();
+    lightboxVideo.removeAttribute("src");
+    lightboxVideo.load();
+  }
+
+  function normalizeMedia(item) {
+    const inferred = item.kind || (item.liveVideo ? "live" : item.poster ? "video" : "photo");
     return {
-      src: photo.src || "",
-      alt: photo.alt || "Фотография из воспоминаний",
-      caption: photo.caption || ""
+      id: item.id || "",
+      kind: inferred,
+      src: item.src || "",
+      thumb: item.thumb || "",
+      poster: item.poster || "",
+      liveVideo: item.liveVideo || "",
+      alt: item.alt || (inferred === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний"),
+      caption: item.caption || "",
+      takenAt: item.takenAt || ""
     };
   }
 
-  function stackRotation(index) {
-    return [-7, 5, -2, 8, -4][index % 5];
+  function formatDate(value) {
+    if (!value) return "Воспоминание";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
   }
 
+  function plural(number, one, few, many) {
+    const mod10 = number % 10;
+    const mod100 = number % 100;
+    if (mod10 === 1 && mod100 !== 11) return one;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+    return many;
+  }
+
+  function stackRotation(index) { return [-7, 5, -2, 8, -4][index % 5]; }
   function pad(value) { return String(value).padStart(2, "0"); }
   function numberOr(value, fallback) { return Number.isFinite(Number(value)) ? Number(value) : fallback; }
   function safeClass(value) { return String(value).toLowerCase().replace(/[^a-z0-9_-]/g, "-"); }
   function reducedMotion() { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; }
-
-  function escapeHtml(value) {
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
+  function escapeHtml(value) { return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
   function escapeAttr(value) { return escapeHtml(value).replace(/`/g, "&#096;"); }
 })();
