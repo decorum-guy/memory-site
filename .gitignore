@@ -2,3 +2,10 @@
 Thumbs.db
 *.tmp
 *.swp
+.memory-venv/
+import/
+ORIGINALS/
+media/generated/
+content/memories.backup-*.js
+__pycache__/
+*.pyc
