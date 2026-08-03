@@ -13,12 +13,23 @@ on:
       - ".github/workflows/design-preview.yml"
       - "!preview/screenshots/**"
       - "!preview/STATUS.md"
+  pull_request:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "assets/**"
+      - "content/**"
+      - "tools/studio.html"
+      - "preview/**"
+      - ".github/workflows/design-preview.yml"
+      - "!preview/screenshots/**"
+      - "!preview/STATUS.md"
 
 permissions:
   contents: write
 
 concurrency:
-  group: design-preview-main
+  group: design-preview-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -27,8 +38,10 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -125,7 +138,7 @@ jobs:
           rm -rf preview/demo-media node_modules package.json package-lock.json
           rm -f media/telegram/chat-*.jpg preview/capture.log
 
-      - name: Publish screenshots into repository
+      - name: Publish screenshots into current branch
         if: always()
         run: |
           git config user.name "github-actions[bot]"
@@ -135,7 +148,8 @@ jobs:
             echo "No preview changes to publish"
           else
             git commit -m "chore(preview): refresh design screenshots [skip ci]"
-            git push
+            BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+            git push origin "HEAD:${BRANCH}"
           fi
 
       - name: Mark failed capture
