@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Memory Studio</title>
+  <style>
+    :root { --paper:#f2eadb; --ink:#28231f; --accent:#9c3f43; --line:#d6c8b2; font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    *{box-sizing:border-box} body{margin:0;background:#c9b89e;color:var(--ink)} button,input,textarea,select{font:inherit}
+    .top{position:sticky;top:0;z-index:100;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;padding:.8rem 1rem;background:rgba(35,31,27,.94);color:#fff;backdrop-filter:blur(12px)}
+    .top h1{margin:0 auto 0 0;font:700 1rem Georgia,serif}.top button,.top label{border:0;padding:.65rem .85rem;background:#f5ecdd;color:#27231f;cursor:pointer;font-weight:750}.top .primary{background:var(--accent);color:#fff}.top input[type=file]{display:none}
+    .status{width:100%;font-size:.76rem;color:#d8cebf}
+    main{width:min(1500px,calc(100% - 2rem));margin:1rem auto 5rem}.intro{padding:1rem 1.2rem;background:#fff8ec;box-shadow:0 .6rem 1.4rem rgba(40,30,20,.12);line-height:1.5}.intro strong{color:var(--accent)}
+    .chapter{margin:1.2rem 0;background:var(--paper);box-shadow:0 1rem 2rem rgba(45,34,25,.18)}.chapter>summary{display:flex;gap:1rem;align-items:center;padding:1rem 1.2rem;cursor:pointer;font:700 1.25rem Georgia,serif}.chapter>summary small{margin-left:auto;font:500 .75rem Inter,sans-serif;color:#716557}.chapter-tools{display:flex;gap:.5rem;padding:0 1.2rem 1rem}.chapter-tools button{border:1px solid var(--line);background:#fff9ef;padding:.5rem .7rem;cursor:pointer}
+    .events{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr));gap:1rem;padding:0 1rem 1rem}.event{min-width:0;padding:.9rem;background:#fffaf1;border:1px solid #d7cab7;box-shadow:0 .5rem 1rem rgba(45,34,25,.1)}.event.dragover{outline:4px solid rgba(156,63,67,.35)}
+    .event-head{display:grid;grid-template-columns:1fr auto;gap:.5rem}.event-head input,.event-head textarea{width:100%;border:1px solid var(--line);background:#fff;padding:.55rem}.event-head textarea{grid-column:1/-1;min-height:3.5rem;resize:vertical}.event-actions{display:flex;gap:.35rem;align-items:start}.event-actions button{border:0;background:#e8ddca;padding:.45rem .55rem;cursor:pointer}.event-actions .danger{background:#f2d8d8;color:#7b2020}
+    .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:.55rem;margin-top:.8rem;min-height:7rem;padding:.25rem}.item{position:relative;min-width:0;padding:.35rem;background:#eee4d3;border:1px solid #cfc1aa;cursor:grab}.item.dragging{opacity:.35}.item img{width:100%;aspect-ratio:1;object-fit:cover;background:#b9ad9b}.item video{width:100%;aspect-ratio:1;object-fit:cover;background:#151515}.item input{width:100%;margin-top:.35rem;border:0;border-top:1px solid #c9bba5;background:#fff9ef;padding:.35rem;font-size:.72rem}.item-meta{position:absolute;left:.55rem;top:.55rem;padding:.2rem .35rem;border-radius:999px;background:rgba(20,18,16,.72);color:#fff;font-size:.6rem;font-weight:800}.item button{position:absolute;right:.45rem;top:.45rem;width:1.45rem;height:1.45rem;border:0;border-radius:50%;background:rgba(255,255,255,.85);cursor:pointer}.empty{grid-column:1/-1;padding:2rem;border:2px dashed #cbbda7;text-align:center;color:#7b7061}
+    dialog{width:min(540px,calc(100% - 2rem));border:0;padding:1rem;background:#fffaf1;box-shadow:0 2rem 5rem rgba(0,0,0,.35)}dialog::backdrop{background:rgba(24,20,17,.65)}dialog textarea{width:100%;min-height:12rem}dialog menu{display:flex;justify-content:flex-end;gap:.5rem;padding:0}
+    @media(max-width:650px){.events{grid-template-columns:1fr}.top h1{width:100%}.top{position:relative}}
+  </style>
+</head>
+<body>
+  <header class="top">
+    <h1>Memory Studio</h1>
+    <button id="undo">↶ Отменить</button>
+    <button id="save-local">Сохранить черновик</button>
+    <button id="restore-local">Вернуть черновик</button>
+    <label>Открыть memories.js<input id="load-file" type="file" accept=".js,.json" /></label>
+    <button class="primary" id="export">Экспортировать memories.js</button>
+    <div class="status" id="status">Загрузка книги…</div>
+  </header>
+
+  <main>
+    <section class="intro">
+      Автоматическая группировка — это <strong>первый черновик, не точная истина</strong>. Перетаскивай карточки между событиями, меняй подписи и порядок. После правок нажми «Экспортировать» и замени файл <code>content/memories.js</code>.
+    </section>
+    <div id="workspace"></div>
+  </main>
+
+  <dialog id="new-event-dialog">
+    <form method="dialog">
+      <h2>Новое событие</h2>
+      <label>Название<input id="new-event-title" value="Новое событие" /></label>
+      <label>Подпись<textarea id="new-event-caption">Добавь сюда одну короткую деталь.</textarea></label>
+      <menu><button value="cancel">Отмена</button><button id="confirm-new-event" value="default">Создать</button></menu>
+    </form>
+  </dialog>
+
+  <script src="../content/memories.js"></script>
+  <script>
+    "use strict";
+    let book = structuredClone(window.MEMORY_BOOK || { meta:{}, chapters:[] });
+    let dragged = null;
+    let targetChapterIndex = 0;
+    const history = [];
+    const workspace = document.getElementById("workspace");
+    const status = document.getElementById("status");
+    const dialog = document.getElementById("new-event-dialog");
+
+    normalizeBook();
+    render();
+
+    function normalizeBook(){
+      book.chapters ||= [];
+      book.chapters.forEach((chapter, ci) => {
+        chapter.id ||= `chapter-${ci+1}`;
+        chapter.blocks ||= [];
+        chapter.blocks = chapter.blocks.filter(Boolean);
+        chapter.blocks.forEach((block, ei) => {
+          if(block.type !== "event") return;
+          block.id ||= `event-${ci}-${ei}`;
+          block.items ||= [];
+          block.layout ||= block.items.length > 7 ? "stack" : "collage";
+        });
+      });
+    }
+
+    function snapshot(){
+      history.push(JSON.stringify(book));
+      if(history.length > 30) history.shift();
+    }
+
+    function render(){
+      workspace.innerHTML = "";
+      book.chapters.forEach((chapter, chapterIndex) => workspace.appendChild(renderChapter(chapter, chapterIndex)));
+      const events = book.chapters.reduce((n,c)=>n+c.blocks.filter(b=>b.type==="event").length,0);
+      const items = book.chapters.reduce((n,c)=>n+c.blocks.reduce((m,b)=>m+(b.items?.length||0),0),0);
+      status.textContent = `${book.chapters.length} глав · ${events} событий · ${items} файлов`;
+    }
+
+    function renderChapter(chapter, chapterIndex){
+      const details = document.createElement("details");
+      details.className = "chapter";
+      details.open = chapterIndex === 0;
+      const events = chapter.blocks.filter(block => block.type === "event");
+      details.innerHTML = `<summary>${escapeHtml(chapter.title || `Глава ${chapterIndex+1}`)}<small>${events.length} событий</small></summary><div class="chapter-tools"><button data-add>＋ Добавить событие</button></div><div class="events"></div>`;
+      details.querySelector("[data-add]").addEventListener("click", () => { targetChapterIndex = chapterIndex; dialog.showModal(); });
+      const container = details.querySelector(".events");
+      events.forEach((event, eventIndex) => container.appendChild(renderEvent(event, chapterIndex, chapter.blocks.indexOf(event), eventIndex)));
+      if(!events.length) container.innerHTML = '<div class="empty">В этой главе пока нет автоматически созданных событий.</div>';
+      return details;
+    }
+
+    function renderEvent(event, chapterIndex, blockIndex){
+      const card = document.createElement("article");
+      card.className = "event";
+      card.dataset.chapter = chapterIndex;
+      card.dataset.block = blockIndex;
+      card.innerHTML = `
+        <div class="event-head">
+          <input data-title value="${escapeAttr(event.title || "Событие")}" aria-label="Название события" />
+          <div class="event-actions">
+            <button data-up title="Выше">↑</button><button data-down title="Ниже">↓</button>
+            <button data-merge title="Объединить с предыдущим">⇧+</button><button class="danger" data-delete title="Удалить пустое событие">×</button>
+          </div>
+          <textarea data-caption aria-label="Подпись события">${escapeHtml(event.caption || "")}</textarea>
+        </div>
+        <div class="items"></div>`;
+      const items = card.querySelector(".items");
+      event.items.forEach((item, itemIndex) => items.appendChild(renderItem(item, chapterIndex, blockIndex, itemIndex)));
+      if(!event.items.length) items.innerHTML = '<div class="empty">Перетащи сюда фото или видео</div>';
+
+      card.querySelector("[data-title]").addEventListener("change", e => { snapshot(); event.title = e.target.value; });
+      card.querySelector("[data-caption]").addEventListener("change", e => { snapshot(); event.caption = e.target.value; });
+      card.querySelector("[data-up]").addEventListener("click", () => moveBlock(chapterIndex, blockIndex, -1));
+      card.querySelector("[data-down]").addEventListener("click", () => moveBlock(chapterIndex, blockIndex, 1));
+      card.querySelector("[data-merge]").addEventListener("click", () => mergePrevious(chapterIndex, blockIndex));
+      card.querySelector("[data-delete]").addEventListener("click", () => deleteEvent(chapterIndex, blockIndex));
+      card.addEventListener("dragover", e => { e.preventDefault(); card.classList.add("dragover"); });
+      card.addEventListener("dragleave", () => card.classList.remove("dragover"));
+      card.addEventListener("drop", e => {
+        e.preventDefault(); card.classList.remove("dragover");
+        if(!dragged) return;
+        moveItem(dragged.chapterIndex, dragged.blockIndex, dragged.itemIndex, chapterIndex, blockIndex);
+      });
+      return card;
+    }
+
+    function renderItem(item, chapterIndex, blockIndex, itemIndex){
+      const card = document.createElement("div");
+      card.className = "item";
+      card.draggable = true;
+      const preview = item.kind === "video"
+        ? `<video muted preload="metadata" poster="${escapeAttr(item.poster || "")}" src="${escapeAttr(item.src || "")}"></video>`
+        : `<img loading="lazy" src="${escapeAttr(item.thumb || item.src || "")}" alt="" />`;
+      card.innerHTML = `${preview}<span class="item-meta">${escapeHtml(item.kind === "live" ? "LIVE" : item.kind === "video" ? "VIDEO" : "PHOTO")}</span><button title="Убрать">×</button><input value="${escapeAttr(item.caption || "")}" aria-label="Подпись файла" />`;
+      card.addEventListener("dragstart", () => { dragged = {chapterIndex,blockIndex,itemIndex}; card.classList.add("dragging"); });
+      card.addEventListener("dragend", () => { dragged = null; card.classList.remove("dragging"); });
+      card.querySelector("input").addEventListener("change", e => { snapshot(); item.caption = e.target.value; });
+      card.querySelector("button").addEventListener("click", () => {
+        snapshot(); book.chapters[chapterIndex].blocks[blockIndex].items.splice(itemIndex,1); render();
+      });
+      return card;
+    }
+
+    function moveItem(fromChapter, fromBlock, fromItem, toChapter, toBlock){
+      snapshot();
+      const source = book.chapters[fromChapter].blocks[fromBlock].items;
+      const [item] = source.splice(fromItem,1);
+      if(item) book.chapters[toChapter].blocks[toBlock].items.push(item);
+      render();
+    }
+
+    function moveBlock(chapterIndex, blockIndex, direction){
+      const blocks = book.chapters[chapterIndex].blocks;
+      let next = blockIndex + direction;
+      while(next >= 0 && next < blocks.length && blocks[next].type !== "event") next += direction;
+      if(next < 0 || next >= blocks.length) return;
+      snapshot(); [blocks[blockIndex],blocks[next]]=[blocks[next],blocks[blockIndex]]; render();
+    }
+
+    function mergePrevious(chapterIndex, blockIndex){
+      const blocks = book.chapters[chapterIndex].blocks;
+      let previous = blockIndex - 1;
+      while(previous >= 0 && blocks[previous].type !== "event") previous--;
+      if(previous < 0) return;
+      snapshot(); blocks[previous].items.push(...(blocks[blockIndex].items || [])); blocks.splice(blockIndex,1); render();
+    }
+
+    function deleteEvent(chapterIndex, blockIndex){
+      const event = book.chapters[chapterIndex].blocks[blockIndex];
+      if(event.items?.length && !confirm("В событии есть файлы. Удалить их из книги?")) return;
+      snapshot(); book.chapters[chapterIndex].blocks.splice(blockIndex,1); render();
+    }
+
+    document.getElementById("confirm-new-event").addEventListener("click", () => {
+      snapshot();
+      book.chapters[targetChapterIndex].blocks.push({type:"event",id:`manual-${Date.now()}`,title:document.getElementById("new-event-title").value,caption:document.getElementById("new-event-caption").value,layout:"collage",items:[]});
+      setTimeout(render,0);
+    });
+
+    document.getElementById("undo").addEventListener("click", () => {
+      const previous = history.pop(); if(!previous) return; book=JSON.parse(previous); render();
+    });
+    document.getElementById("save-local").addEventListener("click", () => {
+      try{localStorage.setItem("memory-studio-draft",JSON.stringify(book));status.textContent="Черновик сохранён в браузере.";}catch(error){status.textContent=`Не удалось сохранить: ${error.message}`;}
+    });
+    document.getElementById("restore-local").addEventListener("click", () => {
+      const value=localStorage.getItem("memory-studio-draft");if(!value)return;snapshot();book=JSON.parse(value);render();
+    });
+    document.getElementById("load-file").addEventListener("change", async e => {
+      const file=e.target.files[0];if(!file)return;const text=await file.text();
+      const match=text.match(/window\.MEMORY_BOOK\s*=\s*([\s\S]*);\s*$/);
+      try{snapshot();book=JSON.parse(match?match[1]:text);normalizeBook();render();}catch(error){alert(`Не удалось прочитать файл: ${error.message}`);}
+    });
+    document.getElementById("export").addEventListener("click", () => {
+      const text="// Экспортировано из tools/studio.html\nwindow.MEMORY_BOOK = "+JSON.stringify(book,null,2)+";\n";
+      const blob=new Blob([text],{type:"text/javascript;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="memories.js";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    });
+
+    function escapeHtml(value){return String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#039;")}
+    function escapeAttr(value){return escapeHtml(value).replace(/`/g,"&#096;")}
+  </script>
+</body>
+</html>
