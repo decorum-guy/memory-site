@@ -14,6 +14,14 @@ async function settle(page) {
   await page.waitForLoadState("networkidle");
   await page.evaluate(async () => {
     if (document.fonts?.ready) await document.fonts.ready;
+    const images = [...document.images];
+    images.forEach((image) => { image.loading = "eager"; });
+    await Promise.all(images.map((image) => image.complete
+      ? Promise.resolve()
+      : new Promise((resolve) => {
+          image.addEventListener("load", resolve, { once: true });
+          image.addEventListener("error", resolve, { once: true });
+        })));
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   });
 }
@@ -76,9 +84,10 @@ await mobile.locator("#open-book").click();
 await mobile.locator("#ordinary-days").scrollIntoViewIfNeeded();
 await mobile.waitForTimeout(220);
 await shot(mobile, "13-event-mobile.png", { fullPage: false });
-await mobile.locator("#telegram").scrollIntoViewIfNeeded();
+const telegramMobile = mobile.locator("#telegram .memory-block--collage").first();
+await telegramMobile.scrollIntoViewIfNeeded();
 await mobile.waitForTimeout(180);
-await shot(mobile, "14-telegram-mobile.png", { fullPage: false });
+await telegramMobile.screenshot({ path: path.join(output, "14-telegram-mobile.png"), animations: "disabled" });
 await mobile.locator("#shared-album").scrollIntoViewIfNeeded();
 await mobile.waitForTimeout(180);
 await shot(mobile, "15-shared-album-mobile.png", { fullPage: false });
