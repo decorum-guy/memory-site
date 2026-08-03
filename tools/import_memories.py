@@ -383,7 +383,7 @@ def visual_similarity(a: Media, b: Media) -> float | None:
         return None
     color_distance = math.sqrt(sum((x - y) ** 2 for x, y in zip(a.avg_rgb, b.avg_rgb))) / 441.67295593
     color_score = 1.0 - min(1.0, color_distance)
-    hamming = (a.dhash ^ b.dhash).bit_count() / 64.0
+    hamming = bin(a.dhash ^ b.dhash).count("1") / 64.0
     hash_score = 1.0 - hamming
     return 0.58 * color_score + 0.42 * hash_score
 
