@@ -8,11 +8,13 @@
   <title>Наша книга воспоминаний</title>
   <link rel="stylesheet" href="assets/styles.css" />
   <link rel="stylesheet" href="assets/media.css" />
+  <link rel="stylesheet" href="assets/production.css" />
 </head>
 <body>
   <div class="ambient-grain" aria-hidden="true"></div>
 
   <header class="cover" id="cover">
+    <div class="cover__spine" aria-hidden="true"></div>
     <div class="cover__corner cover__corner--one" aria-hidden="true"></div>
     <div class="cover__corner cover__corner--two" aria-hidden="true"></div>
     <div class="cover__inner">
@@ -60,7 +62,10 @@
     <div class="noscript">Для просмотра книги нужен JavaScript. Открой файл в современном браузере.</div>
   </noscript>
 
+  <script src="content/settings.js"></script>
   <script src="content/memories.js"></script>
+  <script src="content/telegram.js"></script>
+  <script src="assets/preferences.js"></script>
   <script src="assets/app.js"></script>
 </body>
 </html>
