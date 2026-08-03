@@ -9,6 +9,7 @@ on:
       - "assets/**"
       - "content/**"
       - "tools/studio.html"
+      - "tools/telegram_*"
       - "preview/**"
       - ".github/workflows/design-preview.yml"
       - "!preview/screenshots/**"
@@ -20,6 +21,7 @@ on:
       - "assets/**"
       - "content/**"
       - "tools/studio.html"
+      - "tools/telegram_*"
       - "preview/**"
       - ".github/workflows/design-preview.yml"
       - "!preview/screenshots/**"
@@ -50,8 +52,9 @@ jobs:
 
       - name: Generate temporary demo media
         run: |
-          python -m pip install --disable-pip-version-check Pillow
+          python -m pip install --disable-pip-version-check Pillow qrcode
           python preview/generate_demo_media.py
+          python preview/generate_extra_media.py
           if ! command -v ffmpeg >/dev/null 2>&1; then
             sudo apt-get update
             sudo apt-get install -y ffmpeg
@@ -68,7 +71,9 @@ jobs:
             preview/demo-media/demo-live.mp4
 
       - name: Activate demo content
-        run: cp preview/demo_memories.js content/memories.js
+        run: |
+          cp preview/demo_memories.js content/memories.js
+          cp preview/demo_telegram.js content/telegram.js
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -134,9 +139,9 @@ jobs:
       - name: Restore project and clean temporary files
         if: always()
         run: |
-          git checkout -- content/memories.js
+          git checkout -- content/memories.js content/telegram.js
           rm -rf preview/demo-media node_modules package.json package-lock.json
-          rm -f media/telegram/chat-*.jpg preview/capture.log
+          rm -f media/telegram/chat-* preview/capture.log
 
       - name: Publish screenshots into current branch
         if: always()
