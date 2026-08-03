@@ -6,6 +6,11 @@ Thumbs.db
 import/
 ORIGINALS/
 media/generated/
+media/telegram/*.jpg
+preview/demo-media/
+node_modules/
+package.json
+package-lock.json
 content/memories.backup-*.js
 __pycache__/
 *.pyc
