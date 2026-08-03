@@ -1,0 +1,311 @@
+name: Temporary importer and Studio patch
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "preview/trigger-importer-studio-fix.txt"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Patch compatibility and editing workflow
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # Python 3.9 compatibility.
+          p = Path('tools/import_memories.py')
+          text = p.read_text(encoding='utf-8')
+          old = 'hamming = (a.dhash ^ b.dhash).bit_count() / 64.0'
+          new = 'hamming = bin(a.dhash ^ b.dhash).count("1") / 64.0'
+          if old in text:
+              text = text.replace(old, new)
+          elif new not in text:
+              raise SystemExit('Expected bit_count line not found')
+          p.write_text(text, encoding='utf-8')
+
+          # Safe Studio open/apply commands.
+          p = Path('tools/import_workflow.py')
+          text = p.read_text(encoding='utf-8')
+          marker = '\ndef minimal_reset_book() -> str:\n'
+          insertion = r'''
+
+def root_for_scope(scope: str) -> Path:
+    return TEST_SITE if scope == "test" else ROOT
+
+
+def run_studio(args: argparse.Namespace) -> int:
+    site_root = root_for_scope(args.scope)
+    memories = site_root / "content" / "memories.js"
+    studio = site_root / "tools" / "studio.html"
+    if not memories.exists() or not studio.exists():
+        if args.scope == "test":
+            print("Тестовый сайт ещё не создан. Сначала выполни: python3 tools/import_workflow.py test <папка>", file=sys.stderr)
+        else:
+            print(f"Не найден Studio или memories.js в {site_root}", file=sys.stderr)
+        return 2
+    print(f"Открываю Studio ({args.scope}): {studio}")
+    print("После правок нажми «Экспортировать memories.js», затем примени скачанный файл командой:")
+    print(f"python3 tools/import_workflow.py apply {args.scope} \"$HOME/Downloads/memories.js\" --open")
+    if not args.print_only:
+        open_path(studio)
+    return 0
+
+
+def validate_book_paths(book: dict[str, Any], site_root: Path) -> list[str]:
+    errors: list[str] = []
+    seen: set[str] = set()
+    for item in iter_media_values(book):
+        for key in ("src", "thumb", "poster", "liveVideo"):
+            raw = item.get(key)
+            if not raw or raw in seen:
+                continue
+            seen.add(str(raw))
+            path = Path(str(raw))
+            if path.is_absolute() or ".." in path.parts:
+                errors.append(f"Небезопасный путь: {raw}")
+            elif not (site_root / path).exists():
+                errors.append(f"Файл из экспортированного memories.js не найден: {raw}")
+    return errors
+
+
+def run_apply(args: argparse.Namespace) -> int:
+    site_root = root_for_scope(args.scope)
+    source = args.file.expanduser().resolve()
+    target = site_root / "content" / "memories.js"
+    if args.scope == "test" and not TEST_SITE.exists():
+        print("Тестовая область отсутствует. Сначала запусти test.", file=sys.stderr)
+        return 2
+    if not source.is_file():
+        print(f"Файл не найден: {source}", file=sys.stderr)
+        return 2
+    try:
+        book = extract_book(source)
+    except Exception as exc:
+        print(f"Экспорт Studio не читается: {exc}", file=sys.stderr)
+        return 2
+    path_errors = validate_book_paths(book, site_root)
+    if path_errors:
+        print("Экспорт не применён:", file=sys.stderr)
+        for error in path_errors[:30]:
+            print(f"- {error}", file=sys.stderr)
+        return 1
+    if args.scope == "production" and not confirm("Применить правки Studio к основной книге?", args.yes):
+        print("Отменено.")
+        return 0
+    timestamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup = target.with_name(f"memories.before-studio-{timestamp}.js")
+    if target.exists():
+        shutil.copy2(target, backup)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+    validation_errors = validate_generated_site(site_root)
+    if validation_errors:
+        if backup.exists():
+            shutil.copy2(backup, target)
+        print("Правки отклонены, прежний memories.js восстановлен:", file=sys.stderr)
+        for error in validation_errors[:30]:
+            print(f"- {error}", file=sys.stderr)
+        return 1
+    print(f"Правки применены к {args.scope}: {target}")
+    print(f"Резервная копия: {backup}")
+    if args.open:
+        open_path(site_root / "index.html")
+    else:
+        print(f"Открыть книгу: open \"{site_root / 'index.html'}\"")
+    return 0
+'''
+          if 'def run_studio(args: argparse.Namespace)' not in text:
+              if marker not in text:
+                  raise SystemExit('Insertion marker not found in import_workflow.py')
+              text = text.replace(marker, insertion + marker)
+
+          old_epilog = '''              python3 tools/import_workflow.py test ~/Desktop/test-photos --open
+              python3 tools/import_workflow.py reset test --yes
+              python3 tools/import_workflow.py import ~/Desktop/all-photos --yes'''
+          new_epilog = '''              python3 tools/import_workflow.py test ~/Desktop/test-photos --open
+              python3 tools/import_workflow.py studio test
+              python3 tools/import_workflow.py apply test ~/Downloads/memories.js --open
+              python3 tools/import_workflow.py reset test --yes
+              python3 tools/import_workflow.py import ~/Desktop/all-photos --yes'''
+          text = text.replace(old_epilog, new_epilog)
+
+          cli_marker = '''    production = subparsers.add_parser("import", help="Полный production-импорт")'''
+          cli_insert = '''    studio = subparsers.add_parser("studio", help="Открыть Memory Studio для test или production")
+    studio.add_argument("scope", choices=["test", "production"], nargs="?", default="test")
+    studio.add_argument("--print-only", action="store_true", help="Только показать пути и команду, не открывать браузер")
+    studio.set_defaults(handler=run_studio)
+
+    apply_changes = subparsers.add_parser("apply", help="Применить экспортированный из Studio memories.js")
+    apply_changes.add_argument("scope", choices=["test", "production"])
+    apply_changes.add_argument("file", type=Path)
+    apply_changes.add_argument("--open", action="store_true", help="Открыть книгу после применения")
+    apply_changes.add_argument("--yes", action="store_true", help="Не спрашивать подтверждение для production")
+    apply_changes.set_defaults(handler=run_apply)
+
+'''
+          if 'subparsers.add_parser("studio"' not in text:
+              if cli_marker not in text:
+                  raise SystemExit('CLI marker not found')
+              text = text.replace(cli_marker, cli_insert + cli_marker)
+          p.write_text(text, encoding='utf-8')
+
+          # Make Studio explicitly usable for test and production rehearsal.
+          p = Path('tools/studio.html')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace(
+              '<h1>Memory Studio</h1>',
+              '<h1>Memory Studio <span id="scope-badge"></span></h1><button id="open-book">Открыть книгу ↗</button>'
+          )
+          text = text.replace(
+              'Автоматическая группировка — <strong>первый черновик, а не точная истина</strong>. Перетаскивай карточки между событиями и внутри события, меняй подписи.',
+              'Это полноценная репетиция будущей работы: <strong>первый черновик, а не точная истина</strong>. Меняй подписи, перетаскивай карточки между событиями и внутри события, объединяй и переставляй события.'
+          )
+          init_marker = '    const dialog = document.getElementById("new-event-dialog");\n\n    normalizeBook();'
+          init_new = '''    const dialog = document.getElementById("new-event-dialog");
+    const isTestMode = location.pathname.includes("/.memory-test/site/");
+    document.getElementById("scope-badge").textContent = isTestMode ? "· TEST" : "· PRODUCTION";
+    document.getElementById("open-book").addEventListener("click", () => window.open("../index.html", "_blank"));
+
+    normalizeBook();'''
+          if init_marker in text:
+              text = text.replace(init_marker, init_new)
+          text = text.replace(
+              'link.download="memories.js";',
+              'link.download=isTestMode ? "memories.test-edited.js" : "memories.js";'
+          )
+          text = text.replace(
+              'status.textContent="Файл memories.js экспортирован. Замени им content/memories.js.";',
+              'status.textContent=isTestMode ? "Экспорт готов. Примени его командой import_workflow.py apply test … --open" : "Экспорт готов. Примени его командой import_workflow.py apply production … --open";'
+          )
+          p.write_text(text, encoding='utf-8')
+
+          # Extend Russian testing guide.
+          p = Path('HOW_TO_TEST_IMPORT.md')
+          text = p.read_text(encoding='utf-8')
+          section = r'''
+
+---
+
+## Как полностью протестировать редактирование
+
+После успешного тестового импорта открой именно тестовую Studio:
+
+```bash
+python3 tools/import_workflow.py studio test
+```
+
+Она читает `.memory-test/site/content/memories.js`, поэтому все изменения относятся только к тестовой копии.
+
+В Studio можно:
+
+- менять название и общую подпись события;
+- менять подпись каждого фото и видео;
+- перетаскивать карточки внутри события;
+- переносить карточки между событиями;
+- стрелками `↑` и `↓` менять порядок событий;
+- кнопкой `⇧+` объединять событие с предыдущим;
+- создавать новое пустое событие;
+- убирать элемент из книги, не удаляя исходный файл;
+- ставить и снимать цензуру;
+- сохранять локальный черновик в браузере;
+- отменять последние действия.
+
+Кнопка **«Сохранить черновик»** хранит работу только в браузере. Чтобы увидеть правки в книге, нажми **«Экспортировать memories.js»**. В test-режиме скачается:
+
+```text
+memories.test-edited.js
+```
+
+Примени его к тестовой книге:
+
+```bash
+python3 tools/import_workflow.py apply test \
+  "$HOME/Downloads/memories.test-edited.js" \
+  --open
+```
+
+Команда проверит синтаксис и все пути к медиа, сделает резервную копию прежнего тестового `memories.js`, заменит его и откроет тестовую книгу. Если экспорт повреждён, прежний файл автоматически восстанавливается.
+
+Для настоящей книги процесс будет тем же, меняется только scope:
+
+```bash
+python3 tools/import_workflow.py studio production
+python3 tools/import_workflow.py apply production \
+  "$HOME/Downloads/memories.js" \
+  --open
+```
+
+Перед применением к production программа спросит подтверждение.
+
+### После ошибки `int has no attribute bit_count`
+
+Это была несовместимость импортёра с Python 3.9. Она исправлена. Обнови репозиторий:
+
+```bash
+cd ~/Desktop/memory-site
+git pull
+```
+
+Сбрось незавершённую тестовую копию и повтори импорт:
+
+```bash
+python3 tools/import_workflow.py reset test --yes
+python3 tools/import_workflow.py test \
+  "$HOME/Desktop/memory-test-input" \
+  --open
+```
+'''
+          if '## Как полностью протестировать редактирование' not in text:
+              text += section
+          p.write_text(text, encoding='utf-8')
+
+          # CI must cover the user's Python and applying Studio export.
+          p = Path('.github/workflows/import-workflow-test.yml')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace('python-version: "3.12"', 'python-version: "3.9"')
+          marker = '''      - name: Reset test area only
+        run: |
+          python tools/import_workflow.py reset test --yes'''
+          step = '''      - name: Rehearse Studio export application
+        run: |
+          cp .memory-test/site/content/memories.js /tmp/memories.test-edited.js
+          python - <<'PYEDIT'
+          from pathlib import Path
+          path = Path('/tmp/memories.test-edited.js')
+          text = path.read_text(encoding='utf-8').replace('"title": "Наши три года"', '"title": "Тестовая правка"', 1)
+          path.write_text(text, encoding='utf-8')
+          PYEDIT
+          python tools/import_workflow.py studio test --print-only
+          python tools/import_workflow.py apply test /tmp/memories.test-edited.js
+          grep -q 'Тестовая правка' .memory-test/site/content/memories.js
+          shasum -c /tmp/memories.before
+
+'''
+          if 'Rehearse Studio export application' not in text:
+              if marker not in text:
+                  raise SystemExit('CI reset marker not found')
+              text = text.replace(marker, step + marker)
+          p.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit patch to PR branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
+          git add tools/import_memories.py tools/import_workflow.py tools/studio.html HOW_TO_TEST_IMPORT.md .github/workflows/import-workflow-test.yml
+          if git diff --cached --quiet; then
+            echo "Patch already applied"
+          else
+            git commit -m "fix: support Python 3.9 and rehearse Studio edits"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          fi
