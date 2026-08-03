@@ -26,6 +26,19 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Make regex replacement literal
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("tools/review_round_2_patch.py")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace(
+              "re.subn(pattern, replacement, text, count=1, flags=re.S)",
+              "re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.S)",
+          )
+          path.write_text(text, encoding="utf-8")
+          PY
+
       - name: Apply functional and Studio fixes
         run: |
           python3 tools/review_round_2_patch.py core
