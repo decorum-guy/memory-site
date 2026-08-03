@@ -441,7 +441,7 @@ def media_to_dict(media: Media) -> dict[str, Any]:
     common: dict[str, Any] = {
         "id": media.item_id,
         "src": media.output_src,
-        "caption": media.caption,
+        "caption": "",
         "takenAt": media.taken_at.isoformat(timespec="seconds"),
         "censored": False,
     }

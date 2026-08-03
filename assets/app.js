@@ -22,6 +22,7 @@
   const lightboxNext = byId("lightbox-next");
   const lightboxCensor = byId("lightbox-censor");
   const lightboxCensorShow = byId("lightbox-censor-show");
+  const lightboxCensorClose = byId("lightbox-censor-close");
 
   let activeGallery = [];
   let activeIndex = 0;
@@ -34,6 +35,7 @@
   renderRail();
   bindNavigation();
   observeChapters();
+  restoreReaderChrome();
 
   function byId(id) { return document.getElementById(id); }
 
@@ -109,8 +111,9 @@
 
   function renderEventBlock(wrapper, block, uniqueId) {
     const items = (block.items || []).map(normalizeMedia);
-    const previewItems = items.filter((item) => item.kind !== "audio").slice(0, block.layout === "stack" ? 5 : 7);
-    wrapper.classList.add(`event-layout-${safeClass(block.layout || "collage")}`);
+    const layout = block.layout || (items.length > 8 ? "stack" : "collage");
+    const previewItems = items.filter((item) => item.kind !== "audio").slice(0, layout === "stack" ? 5 : 8);
+    wrapper.classList.add(`event-layout-${safeClass(layout)}`, `event-count-${Math.min(items.length, 8)}`);
     wrapper.innerHTML = `
       <header class="event-heading">
         <div>
@@ -125,10 +128,18 @@
     previewItems.forEach((item, index) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = `event-preview__item event-preview__item--${(index % 7) + 1}`;
-      button.style.setProperty("--event-rotate", `${[-5, 3, -2, 6, -4, 2, -1][index % 7]}deg`);
+      button.className = `event-preview__item event-preview__item--${(index % 8) + 1}`;
+      button.style.setProperty("--event-rotate", `${[-5, 3, -2, 6, -4, 2, -1, 4][index % 8]}deg`);
       button.setAttribute("aria-label", item.censored ? `Открыть скрытый элемент ${index + 1}` : `Открыть элемент ${index + 1}`);
       button.appendChild(createMediaPreview(item));
+      const note = mediaNote(item);
+      if (note) {
+        const label = document.createElement("span");
+        label.className = "event-preview__caption";
+        label.textContent = note;
+        label.title = note;
+        button.appendChild(label);
+      }
       button.addEventListener("click", () => openGallery(items, items.indexOf(item)));
       preview.appendChild(button);
     });
@@ -275,12 +286,17 @@
 
   function createMediaPreview(item) {
     const frame = document.createElement("span");
+    const key = mediaKey(item);
+    const locallyRevealed = revealedCensored.has(key);
+    const isCensored = item.censored && !locallyRevealed;
     frame.className = `image-frame media-kind-${safeClass(item.kind)}`;
-    frame.classList.toggle("is-censored", item.censored);
+    frame.dataset.mediaKey = key;
+    frame.classList.toggle("is-censored", isCensored);
+    frame.classList.toggle("is-revealed", locallyRevealed);
 
     const image = document.createElement("img");
     image.src = item.thumb || item.poster || item.src || "";
-    image.alt = item.censored ? "Скрытое воспоминание" : (item.alt || (item.kind === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний"));
+    image.alt = isCensored ? "Скрытое воспоминание" : (item.alt || (item.kind === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний"));
     image.loading = "lazy";
     image.decoding = "async";
 
@@ -303,7 +319,7 @@
       frame.appendChild(badge);
     }
 
-    if (item.censored) {
+    if (isCensored) {
       const cover = document.createElement("span");
       cover.className = "censor-preview";
       cover.innerHTML = "<strong>Содержание скрыто</strong><small>Нажми, чтобы открыть предупреждение</small>";
@@ -345,6 +361,7 @@
     lightboxNext.addEventListener("click", () => moveGallery(1));
     lightboxLive.addEventListener("click", toggleLive);
     lightboxCensorShow.addEventListener("click", revealCurrentCensored);
+    lightboxCensorClose.addEventListener("click", closeGallery);
     lightbox.addEventListener("click", (event) => { if (event.target === lightbox) closeGallery(); });
     document.addEventListener("keydown", (event) => {
       if (lightbox.hidden) return;
@@ -379,7 +396,6 @@
     activeGallery = items;
     activeIndex = Math.max(0, Math.min(index, items.length - 1));
     previousFocus = document.activeElement;
-    revealedCensored.clear();
     updateLightbox();
     lightbox.hidden = false;
     document.body.classList.add("lightbox-open");
@@ -406,7 +422,7 @@
   function updateLightbox() {
     stopMedia();
     const item = activeGallery[activeIndex];
-    lightboxCaption.textContent = item.caption || item.alt || "";
+    lightboxCaption.innerHTML = renderMediaCaption(item);
     lightboxCounter.textContent = `${activeIndex + 1} / ${activeGallery.length}`;
     const multi = activeGallery.length > 1;
     lightboxPrev.hidden = !multi;
@@ -433,6 +449,7 @@
     const item = activeGallery[activeIndex];
     if (!item) return;
     revealedCensored.add(mediaKey(item));
+    revealPreviewCopies(item);
     lightboxCensor.hidden = true;
     renderLightboxMedia(item);
     lightboxClose.focus();
@@ -498,12 +515,14 @@
     return Boolean(item && item.censored && !revealedCensored.has(mediaKey(item)));
   }
 
-  function mediaKey(item) {
-    return item.id || item.src || `${item.kind}-${activeIndex}`;
+  function mediaKey(item, fallbackIndex = activeIndex) {
+    return String(item.id || item.src || `${item.kind}-${fallbackIndex}`);
   }
 
   function normalizeMedia(item) {
     const inferred = item.kind || (item.liveVideo ? "live" : item.poster ? "video" : "photo");
+    const takenAt = item.takenAt || "";
+    const rawCaption = item.caption || item.note || "";
     return {
       id: item.id || "",
       kind: inferred,
@@ -512,11 +531,60 @@
       poster: item.poster || "",
       liveVideo: item.liveVideo || "",
       alt: item.alt || (inferred === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний"),
-      caption: item.caption || "",
-      takenAt: item.takenAt || "",
+      caption: isGeneratedDateCaption(rawCaption, takenAt) ? "" : rawCaption,
+      takenAt,
       duration: numberOr(item.duration, 0),
       censored: item.censored === true
     };
+  }
+
+  function restoreReaderChrome() {
+    const update = () => {
+      const cover = byId("cover");
+      const threshold = cover ? Math.min(160, cover.offsetHeight * .12) : 80;
+      if (window.scrollY > threshold || window.location.hash) document.body.classList.add("book-opened");
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("pageshow", () => requestAnimationFrame(update));
+  }
+
+  function revealPreviewCopies(item) {
+    const key = mediaKey(item);
+    document.querySelectorAll(".image-frame[data-media-key]").forEach((frame) => {
+      if (frame.dataset.mediaKey !== key) return;
+      frame.classList.remove("is-censored");
+      frame.classList.add("is-revealed");
+      frame.querySelector(".censor-preview")?.remove();
+      const image = frame.querySelector("img");
+      if (image) image.alt = item.alt || (item.kind === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний");
+    });
+  }
+
+  function renderMediaCaption(item) {
+    const date = formatTakenAt(item.takenAt);
+    const note = mediaNote(item);
+    return `${date ? `<span class="lightbox__datetime">${escapeHtml(date)}</span>` : ""}${note ? `<span class="lightbox__note">${escapeHtml(note)}</span>` : ""}`;
+  }
+
+  function mediaNote(item) {
+    const caption = String(item.caption || "").trim();
+    return isGeneratedDateCaption(caption, item.takenAt) ? "" : caption;
+  }
+
+  function formatTakenAt(value) {
+    if (!value) return "";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleString("ru-RU", {
+      day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit"
+    }).replace(",", " ·");
+  }
+
+  function isGeneratedDateCaption(caption, takenAt) {
+    if (!caption || !takenAt) return false;
+    const normalized = String(caption).toLowerCase().replace(/\s+/g, " ").replace(/,/g, " ·").trim();
+    return normalized === formatTakenAt(takenAt).toLowerCase().replace(/\s+/g, " ").trim();
   }
 
   function formatDate(value) {
