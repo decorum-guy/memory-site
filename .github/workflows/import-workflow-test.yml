@@ -1,0 +1,85 @@
+name: Import workflow safety test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tools/import_workflow.py"
+      - "tools/import_memories.py"
+      - "preview/generate_demo_media.py"
+      - ".github/workflows/import-workflow-test.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/import_workflow.py"
+      - "tools/import_memories.py"
+      - "preview/generate_demo_media.py"
+      - ".github/workflows/import-workflow-test.yml"
+
+jobs:
+  test-modes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libimage-exiftool-perl
+          python -m pip install --disable-pip-version-check Pillow pillow-heif
+
+      - name: Generate test media
+        run: |
+          python preview/generate_demo_media.py
+          ffmpeg -hide_banner -loglevel error -y \
+            -loop 1 -i preview/demo-media/video-poster.jpg \
+            -t 2 -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
+            preview/demo-media/test-video.mp4
+
+      - name: Remember production checksums
+        run: |
+          shasum content/memories.js > /tmp/memories.before
+          if [ -d media/generated ]; then
+            find media/generated -type f -print0 | sort -z | xargs -0 shasum > /tmp/generated.before
+          else
+            : > /tmp/generated.before
+          fi
+
+      - name: Dry run changes nothing
+        run: |
+          python tools/import_workflow.py dry-run preview/demo-media
+          shasum -c /tmp/memories.before
+          test ! -e .memory-test
+
+      - name: Isolated test import
+        run: |
+          python tools/import_workflow.py test preview/demo-media
+          test -f .memory-test/site/index.html
+          test -f .memory-test/site/content/memories.js
+          test -f .memory-test/site/content/import-report.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('.memory-test/site/content/import-report.json').read_text())
+          assert report.get('errors') == [], report
+          assert report.get('importedItems', 0) > 0, report
+          PY
+          shasum -c /tmp/memories.before
+
+      - name: Reset test area only
+        run: |
+          python tools/import_workflow.py reset test --yes
+          test ! -e .memory-test
+          shasum -c /tmp/memories.before
+          if [ -s /tmp/generated.before ]; then
+            shasum -c /tmp/generated.before
+          fi
