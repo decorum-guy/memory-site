@@ -40,9 +40,15 @@
       ? "<span>◉</span><strong>Вернуть цензуру</strong>"
       : `<span>◌</span><strong>Показать всё скрытое${censoredCount ? ` · ${censoredCount}` : ""}</strong>`;
     censorButton.addEventListener("click", function () {
-      if (censorshipOff) safeSessionRemove(storageKey);
-      else safeSessionSet(storageKey, "1");
-      window.location.reload();
+      const nextUrl = new URL(window.location.href);
+      if (censorshipOff) {
+        safeSessionRemove(storageKey);
+        nextUrl.searchParams.delete("censor");
+      } else {
+        safeSessionSet(storageKey, "1");
+        nextUrl.searchParams.set("censor", "off");
+      }
+      window.location.href = nextUrl.toString();
     });
 
     const topButton = document.createElement("button");
@@ -88,7 +94,7 @@
 
   function safeSessionSet(key, value) {
     try { window.sessionStorage.setItem(key, value); }
-    catch (_) { /* file:// privacy modes may disable storage */ }
+    catch (_) { /* query parameter remains the fallback */ }
   }
 
   function safeSessionRemove(key) {
