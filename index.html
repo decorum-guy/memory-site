@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#d7c7a9" />
+  <meta name="description" content="Личная книга воспоминаний" />
+  <title>Наша книга воспоминаний</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="ambient-grain" aria-hidden="true"></div>
+
+  <header class="cover" id="cover">
+    <div class="cover__corner cover__corner--one" aria-hidden="true"></div>
+    <div class="cover__corner cover__corner--two" aria-hidden="true"></div>
+    <div class="cover__inner">
+      <p class="cover__eyebrow" id="cover-eyebrow">Личная книга</p>
+      <h1 class="cover__title" id="cover-title">Наши три года</h1>
+      <p class="cover__subtitle" id="cover-subtitle">Всё, что хочется оставить рядом</p>
+      <div class="cover__seal" aria-hidden="true"><span>♥</span></div>
+      <p class="cover__note" id="cover-note">Собрано вручную — из фотографий, видео и маленьких моментов.</p>
+      <button class="open-book" id="open-book" type="button">
+        <span>Открыть книгу</span>
+        <span class="open-book__arrow" aria-hidden="true">↘</span>
+      </button>
+    </div>
+  </header>
+
+  <aside class="chapter-rail" id="chapter-rail" aria-label="Главы книги"></aside>
+
+  <main class="memory-book" id="memory-book" aria-live="polite"></main>
+
+  <footer class="book-footer" id="book-footer">
+    <p>Конец этой страницы — не конец того, что было.</p>
+  </footer>
+
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Просмотр фотографии" hidden>
+    <button class="lightbox__close" id="lightbox-close" type="button" aria-label="Закрыть">×</button>
+    <button class="lightbox__nav lightbox__nav--prev" id="lightbox-prev" type="button" aria-label="Предыдущая фотография">‹</button>
+    <figure class="lightbox__figure">
+      <img class="lightbox__image" id="lightbox-image" alt="" />
+      <figcaption class="lightbox__caption" id="lightbox-caption"></figcaption>
+    </figure>
+    <button class="lightbox__nav lightbox__nav--next" id="lightbox-next" type="button" aria-label="Следующая фотография">›</button>
+    <p class="lightbox__counter" id="lightbox-counter"></p>
+  </div>
+
+  <noscript>
+    <div class="noscript">Для просмотра книги нужен JavaScript. Откройте файл в современном браузере.</div>
+  </noscript>
+
+  <script src="content/memories.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>
