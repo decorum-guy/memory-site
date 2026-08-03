@@ -20,11 +20,14 @@
   const lightboxClose = byId("lightbox-close");
   const lightboxPrev = byId("lightbox-prev");
   const lightboxNext = byId("lightbox-next");
+  const lightboxCensor = byId("lightbox-censor");
+  const lightboxCensorShow = byId("lightbox-censor-show");
 
   let activeGallery = [];
   let activeIndex = 0;
   let previousFocus = null;
   let livePlaying = false;
+  const revealedCensored = new Set();
 
   applyMeta();
   renderBook();
@@ -124,7 +127,7 @@
       button.type = "button";
       button.className = `event-preview__item event-preview__item--${(index % 7) + 1}`;
       button.style.setProperty("--event-rotate", `${[-5, 3, -2, 6, -4, 2, -1][index % 7]}deg`);
-      button.setAttribute("aria-label", `Открыть элемент ${index + 1}`);
+      button.setAttribute("aria-label", item.censored ? `Открыть скрытый элемент ${index + 1}` : `Открыть элемент ${index + 1}`);
       button.appendChild(createMediaPreview(item));
       button.addEventListener("click", () => openGallery(items, items.indexOf(item)));
       preview.appendChild(button);
@@ -205,22 +208,19 @@
   }
 
   function renderVideoBlock(wrapper, block) {
+    const videoItem = normalizeMedia({ ...block, kind: "video" });
     wrapper.innerHTML = `
       <figure class="video-card aspect-${safeClass(block.aspect || "landscape")}">
-        <div class="video-card__frame">
-          <video controls playsinline preload="metadata" ${block.poster ? `poster="${escapeAttr(block.poster)}"` : ""}>
-            <source src="${escapeAttr(block.src || "")}" />
-            Ваш браузер не поддерживает видео.
-          </video>
-          <div class="media-placeholder"><span>Добавь видео</span><small>${escapeHtml(block.src || "media/videos/video.mp4")}</small></div>
-        </div>
+        <button class="video-card__frame" type="button" aria-label="Открыть видео"></button>
         <figcaption>
           ${block.caption ? `<p>${escapeHtml(block.caption)}</p>` : ""}
           ${block.date ? `<span>${escapeHtml(block.date)}</span>` : ""}
         </figcaption>
       </figure>
     `;
-    wrapper.querySelector("video").addEventListener("error", () => wrapper.classList.add("is-missing"));
+    const button = wrapper.querySelector(".video-card__frame");
+    button.appendChild(createMediaPreview(videoItem));
+    button.addEventListener("click", () => openGallery([videoItem], 0));
     return wrapper;
   }
 
@@ -276,11 +276,14 @@
   function createMediaPreview(item) {
     const frame = document.createElement("span");
     frame.className = `image-frame media-kind-${safeClass(item.kind)}`;
+    frame.classList.toggle("is-censored", item.censored);
+
     const image = document.createElement("img");
     image.src = item.thumb || item.poster || item.src || "";
-    image.alt = item.alt || (item.kind === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний");
+    image.alt = item.censored ? "Скрытое воспоминание" : (item.alt || (item.kind === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний"));
     image.loading = "lazy";
     image.decoding = "async";
+
     const placeholder = document.createElement("span");
     placeholder.className = "image-placeholder";
     placeholder.innerHTML = `<span>файл не найден</span><small>${escapeHtml(item.src || "")}</small>`;
@@ -296,8 +299,15 @@
     } else if (item.kind === "video") {
       const badge = document.createElement("span");
       badge.className = "media-badge media-badge--video";
-      badge.textContent = "▶";
+      badge.textContent = item.duration ? `▶ ${formatDuration(item.duration)}` : "▶ VIDEO";
       frame.appendChild(badge);
+    }
+
+    if (item.censored) {
+      const cover = document.createElement("span");
+      cover.className = "censor-preview";
+      cover.innerHTML = "<strong>Содержание скрыто</strong><small>Нажми, чтобы открыть предупреждение</small>";
+      frame.appendChild(cover);
     }
     return frame;
   }
@@ -334,6 +344,7 @@
     lightboxPrev.addEventListener("click", () => moveGallery(-1));
     lightboxNext.addEventListener("click", () => moveGallery(1));
     lightboxLive.addEventListener("click", toggleLive);
+    lightboxCensorShow.addEventListener("click", revealCurrentCensored);
     lightbox.addEventListener("click", (event) => { if (event.target === lightbox) closeGallery(); });
     document.addEventListener("keydown", (event) => {
       if (lightbox.hidden) return;
@@ -342,7 +353,7 @@
       if (event.key === "ArrowRight") moveGallery(1);
       if (event.key === " ") {
         const current = activeGallery[activeIndex];
-        if (current && current.kind === "live") {
+        if (current && current.kind === "live" && !isCurrentCensoredLocked()) {
           event.preventDefault();
           toggleLive();
         }
@@ -368,15 +379,18 @@
     activeGallery = items;
     activeIndex = Math.max(0, Math.min(index, items.length - 1));
     previousFocus = document.activeElement;
+    revealedCensored.clear();
     updateLightbox();
     lightbox.hidden = false;
     document.body.classList.add("lightbox-open");
-    lightboxClose.focus();
+    if (isCurrentCensoredLocked()) lightboxCensorShow.focus();
+    else lightboxClose.focus();
   }
 
   function closeGallery() {
     stopMedia();
     lightbox.hidden = true;
+    lightboxCensor.hidden = true;
     document.body.classList.remove("lightbox-open");
     lightboxImage.removeAttribute("src");
     lightboxVideo.removeAttribute("src");
@@ -400,6 +414,32 @@
     lightbox.classList.toggle("is-video", item.kind === "video");
     lightbox.classList.toggle("is-live", item.kind === "live");
 
+    if (item.censored && !revealedCensored.has(mediaKey(item))) {
+      lockCensoredItem();
+      return;
+    }
+    renderLightboxMedia(item);
+  }
+
+  function lockCensoredItem() {
+    stopMedia();
+    lightboxImage.hidden = true;
+    lightboxVideo.hidden = true;
+    lightboxLive.hidden = true;
+    lightboxCensor.hidden = false;
+  }
+
+  function revealCurrentCensored() {
+    const item = activeGallery[activeIndex];
+    if (!item) return;
+    revealedCensored.add(mediaKey(item));
+    lightboxCensor.hidden = true;
+    renderLightboxMedia(item);
+    lightboxClose.focus();
+  }
+
+  function renderLightboxMedia(item) {
+    lightboxCensor.hidden = true;
     if (item.kind === "video") {
       lightboxImage.hidden = true;
       lightboxVideo.hidden = false;
@@ -407,6 +447,7 @@
       lightboxVideo.controls = true;
       lightboxVideo.muted = false;
       lightboxVideo.loop = false;
+      lightboxVideo.preload = "metadata";
       lightboxVideo.src = item.src || "";
       lightboxLive.hidden = true;
     } else {
@@ -421,7 +462,7 @@
 
   function toggleLive() {
     const item = activeGallery[activeIndex];
-    if (!item || item.kind !== "live" || !item.liveVideo) return;
+    if (!item || item.kind !== "live" || !item.liveVideo || isCurrentCensoredLocked()) return;
     if (livePlaying) {
       stopMedia();
       lightboxImage.hidden = false;
@@ -436,6 +477,7 @@
     lightboxVideo.muted = true;
     lightboxVideo.loop = true;
     lightboxVideo.poster = item.src || "";
+    lightboxVideo.preload = "auto";
     lightboxVideo.src = item.liveVideo;
     lightboxVideo.play().catch(() => {
       lightboxVideo.controls = true;
@@ -451,6 +493,15 @@
     lightboxVideo.load();
   }
 
+  function isCurrentCensoredLocked() {
+    const item = activeGallery[activeIndex];
+    return Boolean(item && item.censored && !revealedCensored.has(mediaKey(item)));
+  }
+
+  function mediaKey(item) {
+    return item.id || item.src || `${item.kind}-${activeIndex}`;
+  }
+
   function normalizeMedia(item) {
     const inferred = item.kind || (item.liveVideo ? "live" : item.poster ? "video" : "photo");
     return {
@@ -462,7 +513,9 @@
       liveVideo: item.liveVideo || "",
       alt: item.alt || (inferred === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний"),
       caption: item.caption || "",
-      takenAt: item.takenAt || ""
+      takenAt: item.takenAt || "",
+      duration: numberOr(item.duration, 0),
+      censored: item.censored === true
     };
   }
 
@@ -470,6 +523,15 @@
     if (!value) return "Воспоминание";
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+  }
+
+  function formatDuration(seconds) {
+    const total = Math.max(0, Math.round(Number(seconds) || 0));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+    if (hours) return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    return `${minutes}:${String(secs).padStart(2, "0")}`;
   }
 
   function plural(number, one, few, many) {
