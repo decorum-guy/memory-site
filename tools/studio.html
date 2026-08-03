@@ -14,8 +14,11 @@
     .chapter{margin:1.2rem 0;background:var(--paper);box-shadow:0 1rem 2rem rgba(45,34,25,.18)}.chapter>summary{display:flex;gap:1rem;align-items:center;padding:1rem 1.2rem;cursor:pointer;font:700 1.25rem Georgia,serif}.chapter>summary small{margin-left:auto;font:500 .75rem Inter,sans-serif;color:#716557}.chapter-tools{display:flex;gap:.5rem;padding:0 1.2rem 1rem}.chapter-tools button{border:1px solid var(--line);background:#fff9ef;padding:.5rem .7rem;cursor:pointer}
     .events{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr));gap:1rem;padding:0 1rem 1rem}.event{min-width:0;padding:.9rem;background:#fffaf1;border:1px solid #d7cab7;box-shadow:0 .5rem 1rem rgba(45,34,25,.1)}.event.dragover{outline:4px solid rgba(156,63,67,.35)}
     .event-head{display:grid;grid-template-columns:1fr auto;gap:.5rem}.event-head input,.event-head textarea{width:100%;border:1px solid var(--line);background:#fff;padding:.55rem}.event-head textarea{grid-column:1/-1;min-height:3.5rem;resize:vertical}.event-actions{display:flex;gap:.35rem;align-items:start}.event-actions button{border:0;background:#e8ddca;padding:.45rem .55rem;cursor:pointer}.event-actions .danger{background:#f2d8d8;color:#7b2020}
-    .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:.55rem;margin-top:.8rem;min-height:7rem;padding:.25rem}.item{position:relative;min-width:0;padding:.35rem;background:#eee4d3;border:1px solid #cfc1aa;cursor:grab}.item.dragging{opacity:.35}.item img{width:100%;aspect-ratio:1;object-fit:cover;background:#b9ad9b}.item video{width:100%;aspect-ratio:1;object-fit:cover;background:#151515}.item input{width:100%;margin-top:.35rem;border:0;border-top:1px solid #c9bba5;background:#fff9ef;padding:.35rem;font-size:.72rem}.item-meta{position:absolute;left:.55rem;top:.55rem;padding:.2rem .35rem;border-radius:999px;background:rgba(20,18,16,.72);color:#fff;font-size:.6rem;font-weight:800}.item button{position:absolute;right:.45rem;top:.45rem;width:1.45rem;height:1.45rem;border:0;border-radius:50%;background:rgba(255,255,255,.85);cursor:pointer}.empty{grid-column:1/-1;padding:2rem;border:2px dashed #cbbda7;text-align:center;color:#7b7061}
-    dialog{width:min(540px,calc(100% - 2rem));border:0;padding:1rem;background:#fffaf1;box-shadow:0 2rem 5rem rgba(0,0,0,.35)}dialog::backdrop{background:rgba(24,20,17,.65)}dialog textarea{width:100%;min-height:12rem}dialog menu{display:flex;justify-content:flex-end;gap:.5rem;padding:0}
+    .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:.55rem;margin-top:.8rem;min-height:7rem;padding:.25rem}.item{position:relative;min-width:0;padding:.35rem;background:#eee4d3;border:1px solid #cfc1aa;cursor:grab}.item.dragging{opacity:.35}.item.drop-before{box-shadow:-5px 0 0 var(--accent)}
+    .item-preview{position:relative;overflow:hidden;background:#b9ad9b}.item-preview img{display:block;width:100%;aspect-ratio:1;object-fit:cover}.item.is-censored .item-preview img{filter:blur(13px) saturate(.5) brightness(.72);transform:scale(1.12)}
+    .item input{width:100%;margin-top:.35rem;border:0;border-top:1px solid #c9bba5;background:#fff9ef;padding:.4rem;font-size:.72rem}.item-meta{position:absolute;left:.35rem;top:.35rem;z-index:3;padding:.2rem .35rem;border-radius:999px;background:rgba(20,18,16,.76);color:#fff;font-size:.58rem;font-weight:800}.item-tools{display:flex;gap:.3rem;margin-top:.35rem}.item-tools button{position:static;flex:1;border:0;padding:.38rem .25rem;background:#ded1bc;cursor:pointer;font-size:.65rem;font-weight:750}.item-tools .censor-on{background:#302b27;color:#fff}.item-tools .remove{flex:0 0 2rem;background:#f0d5d5;color:#741f1f}
+    .empty{grid-column:1/-1;padding:2rem;border:2px dashed #cbbda7;text-align:center;color:#7b7061}
+    dialog{width:min(540px,calc(100% - 2rem));border:0;padding:1rem;background:#fffaf1;box-shadow:0 2rem 5rem rgba(0,0,0,.35)}dialog::backdrop{background:rgba(24,20,17,.65)}dialog label{display:grid;gap:.35rem;margin:.8rem 0}dialog input,dialog textarea{width:100%;padding:.65rem;border:1px solid var(--line)}dialog textarea{min-height:8rem}dialog menu{display:flex;justify-content:flex-end;gap:.5rem;padding:0}
     @media(max-width:650px){.events{grid-template-columns:1fr}.top h1{width:100%}.top{position:relative}}
   </style>
 </head>
@@ -32,7 +35,7 @@
 
   <main>
     <section class="intro">
-      Автоматическая группировка — это <strong>первый черновик, не точная истина</strong>. Перетаскивай карточки между событиями, меняй подписи и порядок. После правок нажми «Экспортировать» и замени файл <code>content/memories.js</code>.
+      Автоматическая группировка — <strong>первый черновик, а не точная истина</strong>. Перетаскивай карточки между событиями и внутри события, меняй подписи. Кнопка «Скрыть» включает цензуру: в финальном сайте файл будет размыт и откроется только после предупреждения.
     </section>
     <div id="workspace"></div>
   </main>
@@ -49,7 +52,8 @@
   <script src="../content/memories.js"></script>
   <script>
     "use strict";
-    let book = structuredClone(window.MEMORY_BOOK || { meta:{}, chapters:[] });
+
+    let book = clone(window.MEMORY_BOOK || { meta:{}, chapters:[] });
     let dragged = null;
     let targetChapterIndex = 0;
     const history = [];
@@ -59,6 +63,8 @@
 
     normalizeBook();
     render();
+
+    function clone(value){ return JSON.parse(JSON.stringify(value)); }
 
     function normalizeBook(){
       book.chapters ||= [];
@@ -71,13 +77,17 @@
           block.id ||= `event-${ci}-${ei}`;
           block.items ||= [];
           block.layout ||= block.items.length > 7 ? "stack" : "collage";
+          block.items.forEach((item, ii) => {
+            item.id ||= `${block.id}-item-${ii}`;
+            item.censored = item.censored === true;
+          });
         });
       });
     }
 
     function snapshot(){
       history.push(JSON.stringify(book));
-      if(history.length > 30) history.shift();
+      if(history.length > 40) history.shift();
     }
 
     function render(){
@@ -85,7 +95,8 @@
       book.chapters.forEach((chapter, chapterIndex) => workspace.appendChild(renderChapter(chapter, chapterIndex)));
       const events = book.chapters.reduce((n,c)=>n+c.blocks.filter(b=>b.type==="event").length,0);
       const items = book.chapters.reduce((n,c)=>n+c.blocks.reduce((m,b)=>m+(b.items?.length||0),0),0);
-      status.textContent = `${book.chapters.length} глав · ${events} событий · ${items} файлов`;
+      const censored = book.chapters.reduce((n,c)=>n+c.blocks.reduce((m,b)=>m+(b.items?.filter(i=>i.censored).length||0),0),0);
+      status.textContent = `${book.chapters.length} глав · ${events} событий · ${items} файлов · ${censored} скрыто`;
     }
 
     function renderChapter(chapter, chapterIndex){
@@ -96,8 +107,8 @@
       details.innerHTML = `<summary>${escapeHtml(chapter.title || `Глава ${chapterIndex+1}`)}<small>${events.length} событий</small></summary><div class="chapter-tools"><button data-add>＋ Добавить событие</button></div><div class="events"></div>`;
       details.querySelector("[data-add]").addEventListener("click", () => { targetChapterIndex = chapterIndex; dialog.showModal(); });
       const container = details.querySelector(".events");
-      events.forEach((event, eventIndex) => container.appendChild(renderEvent(event, chapterIndex, chapter.blocks.indexOf(event), eventIndex)));
-      if(!events.length) container.innerHTML = '<div class="empty">В этой главе пока нет автоматически созданных событий.</div>';
+      events.forEach((event) => container.appendChild(renderEvent(event, chapterIndex, chapter.blocks.indexOf(event))));
+      if(!events.length) container.innerHTML = '<div class="empty">В этой главе пока нет событий.</div>';
       return details;
     }
 
@@ -111,7 +122,7 @@
           <input data-title value="${escapeAttr(event.title || "Событие")}" aria-label="Название события" />
           <div class="event-actions">
             <button data-up title="Выше">↑</button><button data-down title="Ниже">↓</button>
-            <button data-merge title="Объединить с предыдущим">⇧+</button><button class="danger" data-delete title="Удалить пустое событие">×</button>
+            <button data-merge title="Объединить с предыдущим">⇧+</button><button class="danger" data-delete title="Удалить событие">×</button>
           </div>
           <textarea data-caption aria-label="Подпись события">${escapeHtml(event.caption || "")}</textarea>
         </div>
@@ -120,8 +131,8 @@
       event.items.forEach((item, itemIndex) => items.appendChild(renderItem(item, chapterIndex, blockIndex, itemIndex)));
       if(!event.items.length) items.innerHTML = '<div class="empty">Перетащи сюда фото или видео</div>';
 
-      card.querySelector("[data-title]").addEventListener("change", e => { snapshot(); event.title = e.target.value; });
-      card.querySelector("[data-caption]").addEventListener("change", e => { snapshot(); event.caption = e.target.value; });
+      card.querySelector("[data-title]").addEventListener("change", e => { snapshot(); event.title = e.target.value; render(); });
+      card.querySelector("[data-caption]").addEventListener("change", e => { snapshot(); event.caption = e.target.value; render(); });
       card.querySelector("[data-up]").addEventListener("click", () => moveBlock(chapterIndex, blockIndex, -1));
       card.querySelector("[data-down]").addEventListener("click", () => moveBlock(chapterIndex, blockIndex, 1));
       card.querySelector("[data-merge]").addEventListener("click", () => mergePrevious(chapterIndex, blockIndex));
@@ -129,35 +140,53 @@
       card.addEventListener("dragover", e => { e.preventDefault(); card.classList.add("dragover"); });
       card.addEventListener("dragleave", () => card.classList.remove("dragover"));
       card.addEventListener("drop", e => {
+        if(e.target.closest(".item")) return;
         e.preventDefault(); card.classList.remove("dragover");
         if(!dragged) return;
-        moveItem(dragged.chapterIndex, dragged.blockIndex, dragged.itemIndex, chapterIndex, blockIndex);
+        moveItem(dragged.chapterIndex, dragged.blockIndex, dragged.itemIndex, chapterIndex, blockIndex, event.items.length);
       });
       return card;
     }
 
     function renderItem(item, chapterIndex, blockIndex, itemIndex){
       const card = document.createElement("div");
-      card.className = "item";
+      card.className = `item${item.censored ? " is-censored" : ""}`;
       card.draggable = true;
-      const preview = item.kind === "video"
-        ? `<video muted preload="metadata" poster="${escapeAttr(item.poster || "")}" src="${escapeAttr(item.src || "")}"></video>`
-        : `<img loading="lazy" src="${escapeAttr(item.thumb || item.src || "")}" alt="" />`;
-      card.innerHTML = `${preview}<span class="item-meta">${escapeHtml(item.kind === "live" ? "LIVE" : item.kind === "video" ? "VIDEO" : "PHOTO")}</span><button title="Убрать">×</button><input value="${escapeAttr(item.caption || "")}" aria-label="Подпись файла" />`;
+      const previewSrc = item.thumb || item.poster || item.src || "";
+      const kindLabel = item.kind === "live" ? "LIVE" : item.kind === "video" ? `VIDEO${item.duration ? ` · ${formatDuration(item.duration)}` : ""}` : "PHOTO";
+      card.innerHTML = `
+        <div class="item-preview"><img loading="lazy" src="${escapeAttr(previewSrc)}" alt="" /><span class="item-meta">${escapeHtml(kindLabel)}</span></div>
+        <input value="${escapeAttr(item.caption || "")}" aria-label="Подпись файла" />
+        <div class="item-tools">
+          <button data-censor class="${item.censored ? "censor-on" : ""}">${item.censored ? "Скрыто" : "Скрыть"}</button>
+          <button data-remove class="remove" title="Убрать из книги">×</button>
+        </div>`;
+
       card.addEventListener("dragstart", () => { dragged = {chapterIndex,blockIndex,itemIndex}; card.classList.add("dragging"); });
-      card.addEventListener("dragend", () => { dragged = null; card.classList.remove("dragging"); });
-      card.querySelector("input").addEventListener("change", e => { snapshot(); item.caption = e.target.value; });
-      card.querySelector("button").addEventListener("click", () => {
+      card.addEventListener("dragend", () => { dragged = null; card.classList.remove("dragging"); document.querySelectorAll(".drop-before").forEach(el=>el.classList.remove("drop-before")); });
+      card.addEventListener("dragover", e => { e.preventDefault(); e.stopPropagation(); card.classList.add("drop-before"); });
+      card.addEventListener("dragleave", () => card.classList.remove("drop-before"));
+      card.addEventListener("drop", e => {
+        e.preventDefault(); e.stopPropagation(); card.classList.remove("drop-before");
+        if(!dragged) return;
+        moveItem(dragged.chapterIndex, dragged.blockIndex, dragged.itemIndex, chapterIndex, blockIndex, itemIndex);
+      });
+      card.querySelector("input").addEventListener("change", e => { snapshot(); item.caption = e.target.value; render(); });
+      card.querySelector("[data-censor]").addEventListener("click", () => { snapshot(); item.censored = !item.censored; render(); });
+      card.querySelector("[data-remove]").addEventListener("click", () => {
         snapshot(); book.chapters[chapterIndex].blocks[blockIndex].items.splice(itemIndex,1); render();
       });
       return card;
     }
 
-    function moveItem(fromChapter, fromBlock, fromItem, toChapter, toBlock){
+    function moveItem(fromChapter, fromBlock, fromItem, toChapter, toBlock, toIndex){
       snapshot();
       const source = book.chapters[fromChapter].blocks[fromBlock].items;
+      const target = book.chapters[toChapter].blocks[toBlock].items;
       const [item] = source.splice(fromItem,1);
-      if(item) book.chapters[toChapter].blocks[toBlock].items.push(item);
+      if(!item){ render(); return; }
+      if(source === target && fromItem < toIndex) toIndex--;
+      target.splice(Math.max(0, Math.min(toIndex, target.length)), 0, item);
       render();
     }
 
@@ -179,7 +208,7 @@
 
     function deleteEvent(chapterIndex, blockIndex){
       const event = book.chapters[chapterIndex].blocks[blockIndex];
-      if(event.items?.length && !confirm("В событии есть файлы. Удалить их из книги?")) return;
+      if(event.items?.length && !confirm("В событии есть файлы. Удалить их из книги? Исходники на диске останутся.")) return;
       snapshot(); book.chapters[chapterIndex].blocks.splice(blockIndex,1); render();
     }
 
@@ -193,10 +222,10 @@
       const previous = history.pop(); if(!previous) return; book=JSON.parse(previous); render();
     });
     document.getElementById("save-local").addEventListener("click", () => {
-      try{localStorage.setItem("memory-studio-draft",JSON.stringify(book));status.textContent="Черновик сохранён в браузере.";}catch(error){status.textContent=`Не удалось сохранить: ${error.message}`;}
+      try{localStorage.setItem("memory-studio-draft",JSON.stringify(book));status.textContent="Черновик сохранён в этом браузере.";}catch(error){status.textContent=`Не удалось сохранить: ${error.message}`;}
     });
     document.getElementById("restore-local").addEventListener("click", () => {
-      const value=localStorage.getItem("memory-studio-draft");if(!value)return;snapshot();book=JSON.parse(value);render();
+      const value=localStorage.getItem("memory-studio-draft");if(!value)return;snapshot();book=JSON.parse(value);normalizeBook();render();
     });
     document.getElementById("load-file").addEventListener("change", async e => {
       const file=e.target.files[0];if(!file)return;const text=await file.text();
@@ -205,10 +234,17 @@
     });
     document.getElementById("export").addEventListener("click", () => {
       const text="// Экспортировано из tools/studio.html\nwindow.MEMORY_BOOK = "+JSON.stringify(book,null,2)+";\n";
-      const blob=new Blob([text],{type:"text/javascript;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="memories.js";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      const blob=new Blob([text],{type:"text/javascript;charset=utf-8"});
+      const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download="memories.js";link.click();
+      setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+      status.textContent="Файл memories.js экспортирован. Замени им content/memories.js.";
     });
 
-    function escapeHtml(value){return String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#039;")}
+    function formatDuration(seconds){
+      const total=Math.max(0,Math.round(Number(seconds)||0));const h=Math.floor(total/3600);const m=Math.floor((total%3600)/60);const s=total%60;
+      return h?`${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`:`${m}:${String(s).padStart(2,"0")}`;
+    }
+    function escapeHtml(value){return String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
     function escapeAttr(value){return escapeHtml(value).replace(/`/g,"&#096;")}
   </script>
 </body>
