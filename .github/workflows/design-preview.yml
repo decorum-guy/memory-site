@@ -1,0 +1,143 @@
+name: Design preview screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "assets/**"
+      - "content/**"
+      - "tools/studio.html"
+      - "preview/**"
+      - ".github/workflows/design-preview.yml"
+      - "!preview/screenshots/**"
+      - "!preview/STATUS.md"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: design-preview-main
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate temporary demo media
+        run: |
+          python -m pip install --disable-pip-version-check Pillow
+          python preview/generate_demo_media.py
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          ffmpeg -hide_banner -loglevel error -y \
+            -loop 1 -i preview/demo-media/video-poster.jpg \
+            -vf "scale=1280:-2,zoompan=z='min(zoom+0.0008,1.08)':d=120:s=1280x854:fps=30" \
+            -t 4 -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
+            preview/demo-media/demo-video.mp4
+          ffmpeg -hide_banner -loglevel error -y \
+            -loop 1 -i preview/demo-media/photo-11.jpg \
+            -vf "scale=1080:-2,zoompan=z='min(zoom+0.0014,1.10)':d=90:s=1080x1440:fps=30" \
+            -t 3 -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
+            preview/demo-media/demo-live.mp4
+
+      - name: Activate demo content
+        run: cp preview/demo_memories.js content/memories.js
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund playwright@1.54.2
+          npx playwright install --with-deps chromium
+
+      - name: Start local site
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/memory-site-server.log 2>&1 &
+          echo $! > /tmp/memory-site-server.pid
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/memory-site-server.log
+          exit 1
+
+      - name: Capture desktop and mobile screenshots
+        id: capture
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node preview/capture.mjs 2>&1 | tee preview/capture.log
+
+      - name: Write preview status
+        if: always()
+        env:
+          CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
+        run: |
+          {
+            echo "# Design Preview Status"
+            echo
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "- Result: **${CAPTURE_OUTCOME}**"
+            if [ "${CAPTURE_OUTCOME}" != "success" ]; then
+              echo
+              echo "## Последние строки ошибки"
+              echo '```text'
+              tail -n 80 preview/capture.log 2>/dev/null || true
+              echo '```'
+            fi
+          } > preview/STATUS.md
+
+      - name: Upload screenshot artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: memory-site-design-preview
+          path: |
+            preview/screenshots
+            preview/STATUS.md
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Restore project and clean temporary files
+        if: always()
+        run: |
+          git checkout -- content/memories.js
+          rm -rf preview/demo-media node_modules package.json package-lock.json
+          rm -f media/telegram/chat-*.jpg preview/capture.log
+
+      - name: Publish screenshots into repository
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f preview/screenshots preview/STATUS.md || true
+          if git diff --cached --quiet; then
+            echo "No preview changes to publish"
+          else
+            git commit -m "chore(preview): refresh design screenshots [skip ci]"
+            git push
+          fi
+
+      - name: Mark failed capture
+        if: steps.capture.outcome != 'success'
+        run: exit 1
