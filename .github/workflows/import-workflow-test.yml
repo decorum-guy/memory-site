@@ -8,7 +8,6 @@ on:
       - "tools/import_workflow.py"
       - "tools/import_memories.py"
       - "preview/generate_demo_media.py"
-      - "preview/import-workflow-trigger.txt"
       - ".github/workflows/import-workflow-test.yml"
   pull_request:
     branches: [main]
@@ -16,7 +15,6 @@ on:
       - "tools/import_workflow.py"
       - "tools/import_memories.py"
       - "preview/generate_demo_media.py"
-      - "preview/import-workflow-trigger.txt"
       - ".github/workflows/import-workflow-test.yml"
 
 jobs:
