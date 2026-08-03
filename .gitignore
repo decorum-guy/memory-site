@@ -3,6 +3,8 @@ Thumbs.db
 *.tmp
 *.swp
 .memory-venv/
+.memory-test/
+.memory-backups/
 import/
 ORIGINALS/
 media/generated/
