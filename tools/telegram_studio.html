@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telegram Studio · Memory Site</title>
+  <style>
+    :root{--paper:#f4ebdc;--ink:#2c2824;--muted:#756a5e;--accent:#4b7692;--line:#d5c7b1;--danger:#8a3636;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    *{box-sizing:border-box}body{margin:0;color:var(--ink);background:linear-gradient(120deg,#aa987f,#cdbc9f 50%,#9e896d)}button,input,textarea{font:inherit}button{cursor:pointer}
+    .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;padding:.8rem 1rem;color:#fff;background:rgba(35,31,28,.94);backdrop-filter:blur(12px)}
+    .top h1{margin:0 auto 0 0;font:700 1rem Georgia,serif}.top button{border:0;padding:.65rem .9rem;background:#f7efdf;color:#2b2723;font-weight:800}.top .primary{background:var(--accent);color:#fff}.status{width:100%;color:#d8cec0;font-size:.75rem}
+    main{width:min(1420px,calc(100% - 2rem));margin:1rem auto 5rem}.panel{padding:1.2rem;background:var(--paper);box-shadow:0 1rem 2.5rem rgba(45,32,20,.2)}
+    .intro{display:grid;grid-template-columns:1.2fr .8fr;gap:1rem;align-items:start}.fields{display:grid;gap:.7rem}.fields label{display:grid;gap:.3rem;font-size:.75rem;font-weight:800}.fields input,.fields textarea{width:100%;border:1px solid var(--line);padding:.7rem;background:#fffaf2}.fields textarea{min-height:5rem;resize:vertical}
+    .drop{min-height:15rem;display:grid;place-content:center;text-align:center;padding:2rem;border:2px dashed #9ca9ad;background:rgba(221,234,240,.56);transition:.2s}.drop.is-over{border-color:var(--accent);background:#dcecf3;transform:scale(1.01)}.drop strong{font:700 1.4rem Georgia,serif}.drop p{max-width:32rem;margin:.7rem auto;color:var(--muted);line-height:1.5}.drop input{display:none}.drop button{justify-self:center;border:1px solid var(--accent);padding:.65rem .9rem;background:#fff;color:var(--accent);font-weight:800}
+    .summary{display:flex;justify-content:space-between;gap:1rem;align-items:center;margin:1rem 0;padding:.8rem 1rem;background:#fff7e8}.summary p{margin:0;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:1rem}.card{position:relative;min-width:0;padding:.55rem;background:#fff9ef;border:1px solid var(--line);box-shadow:0 .7rem 1.3rem rgba(42,31,20,.12);cursor:grab}.card.dragging{opacity:.35}.card.drop-before{box-shadow:-6px 0 0 var(--accent),0 .7rem 1.3rem rgba(42,31,20,.12)}
+    .preview{height:240px;display:grid;place-items:center;overflow:hidden;background:#e2d8c8}.preview img{width:100%;height:100%;object-fit:contain}.card.cutout .preview{background:repeating-linear-gradient(45deg,#ddd 0 10px,#eee 10px 20px)}.card.cutout .preview img{filter:drop-shadow(0 .8rem .8rem rgba(35,27,20,.24))}
+    .meta{display:flex;justify-content:space-between;gap:.4rem;margin:.5rem 0;color:var(--muted);font-size:.68rem}.card input{width:100%;border:1px solid var(--line);padding:.5rem;background:#fff}.tools{display:flex;gap:.35rem;margin-top:.45rem}.tools button{flex:1;border:0;padding:.45rem;background:#dfd3c1;font-size:.68rem;font-weight:800}.tools .mode.active{background:#2f3d45;color:#fff}.tools .remove{flex:0 0 2.2rem;background:#efd2d2;color:var(--danger)}
+    .empty{grid-column:1/-1;padding:4rem 1rem;text-align:center;color:var(--muted);border:2px dashed rgba(75,61,45,.25)}
+    .progress{position:fixed;inset:auto 1rem 1rem auto;z-index:30;min-width:16rem;padding:.9rem 1rem;color:#fff;background:#2d2925;box-shadow:0 1rem 3rem rgba(0,0,0,.3)}
+    @media(max-width:800px){.intro{grid-template-columns:1fr}.top{position:relative}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.preview{height:180px}}
+    @media(max-width:520px){main{width:min(100% - 1rem,1420px)}.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header class="top">
+    <h1>Telegram Studio</h1>
+    <button id="reload">Перезагрузить</button>
+    <button class="primary" id="save">Сохранить главу</button>
+    <div class="status" id="status">Подключение к локальному серверу…</div>
+  </header>
+
+  <main>
+    <section class="panel intro">
+      <div class="fields">
+        <label>Название главы<input id="title" /></label>
+        <label>Подзаголовок<textarea id="subtitle"></textarea></label>
+        <label>Вступительная записка<textarea id="intro"></textarea></label>
+        <label>Финальная цитата, необязательно<textarea id="quote"></textarea></label>
+      </div>
+      <label class="drop" id="drop">
+        <strong>Перетащи скриншоты сюда</strong>
+        <p>PNG с прозрачностью автоматически оформятся как вырезки без белой карточки. JPG и обычные PNG — как бумажные фрагменты. Порядок потом можно менять перетаскиванием.</p>
+        <button type="button" id="choose">Выбрать файлы</button>
+        <input id="files" type="file" multiple accept="image/png,image/jpeg,image/webp" />
+      </label>
+    </section>
+
+    <section class="summary">
+      <p id="count">0 файлов</p>
+      <p>На сайте материалы автоматически разбиваются на развороты по 7 элементов.</p>
+    </section>
+
+    <section class="grid" id="grid"></section>
+  </main>
+
+  <div class="progress" id="progress" hidden></div>
+
+  <script>
+    "use strict";
+    let state={title:"",subtitle:"",intro:"",quote:"",items:[]};
+    let dragged=-1;
+    const $=id=>document.getElementById(id);
+    const grid=$("grid"),status=$("status"),progress=$("progress"),drop=$("drop"),files=$("files");
+
+    load();
+
+    async function load(){
+      try{
+        const response=await fetch("/api/telegram/state");
+        if(!response.ok)throw new Error("Не удалось прочитать состояние");
+        state=await response.json();
+        syncFields();render();status.textContent="Готово. Всё работает локально и не загружается в интернет.";
+      }catch(error){status.textContent=`Ошибка: ${error.message}. Запусти python3 tools/telegram_server.py`;}
+    }
+
+    function syncFields(){["title","subtitle","intro","quote"].forEach(key=>$(key).value=state[key]||"")}
+    function readFields(){["title","subtitle","intro","quote"].forEach(key=>state[key]=$(key).value)}
+
+    function render(){
+      grid.innerHTML="";
+      state.items.forEach((item,index)=>grid.appendChild(renderCard(item,index)));
+      if(!state.items.length)grid.innerHTML='<div class="empty">Пока ничего не загружено. Перетащи сюда подготовленные скриншоты.</div>';
+      $("count").textContent=`${state.items.length} ${plural(state.items.length,"файл","файла","файлов")} · ${Math.ceil(state.items.length/7)||0} ${plural(Math.ceil(state.items.length/7),"разворот","разворота","разворотов")}`;
+    }
+
+    function renderCard(item,index){
+      const card=document.createElement("article");
+      card.className=`card ${item.mode==="cutout"?"cutout":"paper"}`;card.draggable=true;
+      card.innerHTML=`<div class="preview"><img src="../${escAttr(item.src)}" alt="" /></div><div class="meta"><span>${index+1}</span><span>${esc(item.name||item.src.split("/").pop())}</span></div><input value="${escAttr(item.caption||"")}" placeholder="Подпись к фрагменту" /><div class="tools"><button class="mode ${item.mode==="cutout"?"active":""}" data-mode>${item.mode==="cutout"?"Вырезка":"Карточка"}</button><button class="remove" data-remove title="Убрать из главы">×</button></div>`;
+      card.addEventListener("dragstart",()=>{dragged=index;card.classList.add("dragging")});
+      card.addEventListener("dragend",()=>{dragged=-1;document.querySelectorAll(".drop-before").forEach(x=>x.classList.remove("drop-before"));card.classList.remove("dragging")});
+      card.addEventListener("dragover",event=>{event.preventDefault();card.classList.add("drop-before")});
+      card.addEventListener("dragleave",()=>card.classList.remove("drop-before"));
+      card.addEventListener("drop",event=>{event.preventDefault();event.stopPropagation();card.classList.remove("drop-before");if(dragged<0||dragged===index)return;const [moved]=state.items.splice(dragged,1);state.items.splice(dragged<index?index-1:index,0,moved);render()});
+      card.querySelector("input").addEventListener("change",event=>item.caption=event.target.value);
+      card.querySelector("[data-mode]").addEventListener("click",()=>{item.mode=item.mode==="cutout"?"paper":"cutout";render()});
+      card.querySelector("[data-remove]").addEventListener("click",()=>{state.items.splice(index,1);render()});
+      return card;
+    }
+
+    $("choose").addEventListener("click",event=>{event.preventDefault();files.click()});
+    files.addEventListener("change",()=>uploadFiles([...files.files]));
+    ["dragenter","dragover"].forEach(type=>drop.addEventListener(type,event=>{event.preventDefault();drop.classList.add("is-over")}));
+    ["dragleave","drop"].forEach(type=>drop.addEventListener(type,event=>{event.preventDefault();drop.classList.remove("is-over")}));
+    drop.addEventListener("drop",event=>uploadFiles([...event.dataTransfer.files]));
+
+    async function uploadFiles(input){
+      const selected=input.filter(file=>/^image\/(png|jpeg|webp)$/.test(file.type));
+      if(!selected.length)return;
+      progress.hidden=false;
+      for(let index=0;index<selected.length;index++){
+        const file=selected[index];progress.textContent=`Загрузка ${index+1}/${selected.length}: ${file.name}`;
+        try{
+          const data=await toDataUrl(file);
+          const response=await fetch("/api/telegram/upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:file.name,data})});
+          const result=await response.json();if(!response.ok)throw new Error(result.error||"Ошибка загрузки");state.items.push(result);
+        }catch(error){alert(`${file.name}: ${error.message}`)}
+      }
+      progress.hidden=true;files.value="";render();
+    }
+
+    $("save").addEventListener("click",async()=>{
+      readFields();status.textContent="Сохраняю…";
+      try{
+        const response=await fetch("/api/telegram/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(state)});
+        const result=await response.json();if(!response.ok)throw new Error(result.error||"Ошибка сохранения");status.textContent=`Сохранено: ${result.items} файлов. Теперь можно включить telegramEnabled: true.`;
+      }catch(error){status.textContent=`Ошибка сохранения: ${error.message}`}
+    });
+    $("reload").addEventListener("click",()=>load());
+
+    function toDataUrl(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(file)})}
+    function plural(n,one,few,many){const a=n%10,b=n%100;return a===1&&b!==11?one:a>=2&&a<=4&&(b<12||b>14)?few:many}
+    function esc(value){return String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
+    function escAttr(value){return esc(value).replace(/`/g,"&#096;")}
+  </script>
+</body>
+</html>
