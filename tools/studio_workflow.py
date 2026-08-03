@@ -74,6 +74,14 @@ def confirm(message: str, assume_yes: bool) -> bool:
     return answer in {"y", "yes", "д", "да"}
 
 
+def prepare_test_studio(studio: Path) -> None:
+    """Разделяет test и production localStorage и имя скачиваемого файла."""
+    text = studio.read_text(encoding="utf-8")
+    text = text.replace('"memory-studio-draft"', '"memory-studio-draft-test"')
+    text = text.replace('link.download="memories.js";', 'link.download="memories.test-edited.js";')
+    studio.write_text(text, encoding="utf-8")
+
+
 def command_open(args: argparse.Namespace) -> int:
     root = site_root(args.scope)
     studio = root / "tools" / "studio.html"
@@ -84,10 +92,13 @@ def command_open(args: argparse.Namespace) -> int:
         else:
             print(f"Не найдены Studio или memories.js в {root}", file=sys.stderr)
         return 2
+    if args.scope == "test":
+        prepare_test_studio(studio)
+    export_name = "memories.test-edited.js" if args.scope == "test" else "memories.js"
     print(f"Открываю Memory Studio ({args.scope}): {studio}")
     print("После редактирования нажми «Экспортировать memories.js».")
     print("Затем примени скачанный файл командой:")
-    print(f"python3 tools/studio_workflow.py apply {args.scope} \"$HOME/Downloads/memories.js\" --open")
+    print(f"python3 tools/studio_workflow.py apply {args.scope} \"$HOME/Downloads/{export_name}\" --open")
     open_path(studio)
     return 0
 
