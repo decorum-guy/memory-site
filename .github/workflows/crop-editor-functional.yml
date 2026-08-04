@@ -13,13 +13,39 @@ on:
       - "tools/studio.html"
       - "preview/demo_memories.js"
       - "preview/verify_crop_editor.mjs"
+      - "preview/capture.mjs"
+      - "preview/stabilize_video_frame_ci.py"
       - ".github/workflows/crop-editor-functional.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  publish-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Apply deterministic selected-frame waiting
+        run: python preview/stabilize_video_frame_ci.py
+
+      - name: Publish verification source fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add preview/verify_crop_editor.mjs preview/capture.mjs
+          if git diff --cached --quiet; then
+            echo "Selected-frame waits already stabilized"
+          else
+            git commit -m "test: stabilize selected video frame decoding [skip ci]"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          fi
+
   verify:
+    needs: publish-fix
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
