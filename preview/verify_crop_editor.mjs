@@ -68,7 +68,7 @@ try {
   await ordinaryChapter.evaluate((element) => { element.open = true; });
   await ordinaryChapter.scrollIntoViewIfNeeded();
 
-  const firstPhotoItem = ordinaryChapter.locator(".item").filter({ hasText: "PHOTO" }).first();
+  const firstPhotoItem = ordinaryChapter.locator(".item-meta").filter({ hasText: /^PHOTO$/ }).first().locator("../..");
   await firstPhotoItem.locator(".item-preview").hover();
   await firstPhotoItem.locator("[data-crop]").click();
   await studio.locator("#crop-dialog").waitFor({ state: "visible" });
@@ -102,9 +102,19 @@ try {
   assert(restoredCropAfterCancel === savedPosition, `crop cancel changed committed position: ${savedPosition} -> ${restoredCropAfterCancel}`);
   await studio.locator("#crop-cancel").click();
 
-  const videoItem = ordinaryChapter.locator(".item").filter({ hasText: "VIDEO" }).first();
+  const videoItem = ordinaryChapter.locator(".item-meta").filter({ hasText: /^VIDEO/ }).first().locator("../..");
+  await videoItem.scrollIntoViewIfNeeded();
   await videoItem.locator(".item-preview").hover();
   await videoItem.locator("[data-crop]").click();
+  await studio.locator("#crop-dialog").waitFor({ state: "visible" });
+  const videoCropState = await studio.evaluate(() => ({
+    frameButtonHidden: document.getElementById("open-frame-picker")?.hidden,
+    cropMediaTag: document.querySelector("#crop-stage [data-crop-media]")?.tagName,
+    cropDialogOpen: document.getElementById("crop-dialog")?.open,
+  }));
+  assert(videoCropState.cropDialogOpen, `video crop dialog did not open: ${JSON.stringify(videoCropState)}`);
+  assert(videoCropState.frameButtonHidden === false, `video frame button stayed hidden: ${JSON.stringify(videoCropState)}`);
+  assert(videoCropState.cropMediaTag === "VIDEO", `video crop editor did not render a video preview: ${JSON.stringify(videoCropState)}`);
   await studio.locator("#open-frame-picker").click();
   await studio.locator("#frame-view").waitFor({ state: "visible" });
   await waitForVideoMetadata(studio.locator("#frame-video"));
@@ -134,7 +144,7 @@ try {
 
   const journeysChapter = studio.locator("details.chapter").nth(2);
   await journeysChapter.evaluate((element) => { element.open = true; });
-  const liveItem = journeysChapter.locator(".item").filter({ hasText: "LIVE" }).first();
+  const liveItem = journeysChapter.locator(".item-meta").filter({ hasText: /^LIVE$/ }).first().locator("../..");
   await liveItem.scrollIntoViewIfNeeded();
   await liveItem.locator(".item-preview").hover();
   await liveItem.locator("[data-crop]").click();
@@ -158,6 +168,7 @@ try {
     savedPosition,
     restoredCropAfterCancel,
     restoredFrameValue,
+    videoCropState,
     exportedCrop: true,
     exportedPosterTime: 2.6,
     liveTimelineHidden: true,
