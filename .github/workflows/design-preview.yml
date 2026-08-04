@@ -45,6 +45,20 @@ jobs:
         with:
           ref: ${{ github.head_ref || github.ref_name }}
 
+      - name: Update Telegram mobile preview selector
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("preview/capture.mjs")
+          text = path.read_text(encoding="utf-8")
+          old = 'const telegramMobile = mobile.locator("#telegram .memory-block--collage").first();'
+          new = 'const telegramMobile = mobile.locator("#telegram .telegram-message").first();'
+          if old in text:
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          elif new not in text:
+              raise SystemExit("Telegram mobile preview selector anchor not found")
+          PY
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -148,16 +162,16 @@ jobs:
           rm -rf preview/demo-media node_modules package.json package-lock.json
           rm -f media/telegram/chat-* preview/capture.log
 
-      - name: Publish screenshots into current branch
+      - name: Publish screenshots and capture selector into current branch
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f preview/screenshots preview/STATUS.md || true
+          git add -f preview/screenshots preview/STATUS.md preview/capture.mjs || true
           if git diff --cached --quiet; then
             echo "No preview changes to publish"
           else
-            git commit -m "chore(preview): refresh design screenshots [skip ci]"
+            git commit -m "chore(preview): refresh round 3 design screenshots [skip ci]"
             BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
             git push origin "HEAD:${BRANCH}"
           fi
