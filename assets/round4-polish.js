@@ -149,8 +149,12 @@
       const video = document.getElementById("lightbox-video");
       if (!liveButton || !soundButton || !video) return;
 
+      let preferredMuted = false;
+      let syncGeneration = 0;
+
+      const isLiveActive = () => !video.hidden && !liveButton.hidden && Boolean(video.currentSrc || video.getAttribute("src"));
       const renderSound = () => {
-        const active = !video.hidden && !liveButton.hidden && Boolean(video.currentSrc || video.getAttribute("src"));
+        const active = isLiveActive();
         soundButton.hidden = !active;
         if (!active) return;
         soundButton.textContent = video.muted ? "🔇" : "🔊";
@@ -158,22 +162,34 @@
         soundButton.setAttribute("aria-label", video.muted ? "Включить звук" : "Выключить звук");
         soundButton.title = video.muted ? "Включить звук" : "Выключить звук";
       };
+      const syncPreferredSound = (generation) => {
+        if (generation !== syncGeneration || !isLiveActive()) return;
+        video.muted = preferredMuted;
+        if (!preferredMuted) video.volume = 1;
+        renderSound();
+      };
 
       liveButton.addEventListener("click", () => {
-        requestAnimationFrame(() => {
-          if (!video.hidden && (video.currentSrc || video.getAttribute("src"))) {
-            video.muted = false;
-            video.volume = 1;
-          }
-          renderSound();
+        const generation = ++syncGeneration;
+        preferredMuted = false;
+        [0, 40, 120, 260].forEach((delay) => {
+          window.setTimeout(() => syncPreferredSound(generation), delay);
         });
       });
       soundButton.addEventListener("click", () => {
-        video.muted = !video.muted;
+        preferredMuted = !video.muted;
+        video.muted = preferredMuted;
+        if (!preferredMuted) video.volume = 1;
         renderSound();
       });
-      new MutationObserver(renderSound).observe(video, { attributes: true, attributeFilter: ["hidden", "src"] });
+      new MutationObserver(() => {
+        renderSound();
+        if (isLiveActive()) syncPreferredSound(syncGeneration);
+      }).observe(video, { attributes: true, attributeFilter: ["hidden", "src"] });
       new MutationObserver(renderSound).observe(liveButton, { attributes: true, childList: true, subtree: true });
+      ["loadedmetadata", "loadeddata", "canplay", "playing"].forEach((name) => {
+        video.addEventListener(name, () => syncPreferredSound(syncGeneration));
+      });
       video.addEventListener("volumechange", renderSound);
       renderSound();
     }
