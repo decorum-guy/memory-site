@@ -1,4 +1,4 @@
-name: Install cursor PNG fallback
+name: Finish cursor integration
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  install:
+  patch:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,22 +20,88 @@ jobs:
           ref: review-round-2-polish
           fetch-depth: 0
 
-      - name: Write PNG cursor fallback
+      - name: Extend verification and clean non-workflow helpers
         run: |
-          mkdir -p assets/cursors
           python - <<'PY'
           from pathlib import Path
-          Path("assets/cursors/scrapbook-pencil-final-v19.png").write_bytes(bytes.fromhex("89504e470d0a1a0a0000000d4948445200000020000000200806000000737a7af400000006624b474400ff00ff00ffa0bda79300000610494441545885bd96fd7354d519c7bfe7dcbbf7deddbbefbb689a17b16421900d85122d8989b82a3a4d6d1d1d270e0a8c433ba2d34ec1b19d69fb9bff82bfd4994eab7d05c232ad1949ed80285a2489e08c9a100836ec6b76b32f099b70377777efcbf10704b2497809843ebf9ee73e9fcff39c7beeb9c05d8c37007ab31c7237c04f7734399ca81c62c00f0c83bd7a6020da73bddc9b1a2e35ba432bec4e68c76a6479cb33812637a1e4efcfb7ddffd2f5f2b9e584ffa4b5d62613f9c83db275e34b2d1ba53abb03f576073d3395fb71b0de35359c9c3e75d7044221f0f772fe5e9fcddafed396ef4b2277b9b4d76a45bdc3498727734fb4d4ba2687c7ab25964560fbe680d3c1798f1986117a616d0bef95ac55eb5ec98a954e173794cf3fb97ea56b66285e185c3681eef67a2f15b8a8dbe369b4d9ed381d8fa1c9eb23b245a8caf3481256ba5cdc5036fb78f03e4f6938513879c702db37079c54e0a21e8fc7b56dd72eb269f36672feec28fa236364b5d707fb3c09b7286195dbc37d99cd84d6d539bf38939c3e7fdba7a0ab2b20c2a2f75206674d5d2d04510421043b5e799978be53c3fef4d5174829ca82e76a65076a64bbc953da0adce604ba8341c14e4b7d3e2b7de8950724cb272313c8e726b1aaa9098410acdfb489c4a351f6c9f95112f0b8e114440080c918f69f1bae2495991823e6cb43f1e9d29205ba834141f4140ffbacf4e13d6db2e4b37168dbe0c791d309a4c6d3685cbb168410346fd84032a9343b3e3a42beebf2c0210a089f1fa98c152ea6cb15d6d93310cb2f7902ddc1a020ba8b87bd36f2f09e36599205025b9d1fce7b5d58536fc3f1cf2248a73257259ad6b7906c7a821d3f3b422e4c17f4e8742155aeb0b6f0a9e8c4959ab72cd0d515101db4f46faf8d76ee6dbf0617bc0ea42755dcc3eb6896caf8782487f1641a81b5eb4028c19ae03a323234c4b2d3850cc7b807f60f463273ebde9240575740f45ed20efbacb4736ee716af03e9bc0a2fd5319b9cc44cd9c483351c4e8ce61189c6b1a6b919c70ef721954818a6ce36eeeb8f8ccfaf7dd3cbe8db3deff54824b4b7dd26c902bddcb9cf8e74ae0c0fad404d4e215b34e0e4814b451d458d61dfa809958aa8a8255333cdd0814f23ff5dacfe0d277005ee9648e8b52bf05a3f04ff15b85605578a3a000681037898e658beacab9af1a383fdb18faec7e06f08772bbd2e913ebaa74d166581c056eb87e87720952dc16dd1a0c6f3c816cdab70060600f83a6fb0c1b4ae964cb32d3c9818be51938b4e60776bab85d90bbd4e893eb6b75d169de265b8e073209d2fc1c5e92827178747260df641522fe754b6e5e040e2cb1bc18145fe0776b7b65a66adf97f3944fae87cf8c4a40a3767a03c9e435659088f150c762ca9577265fa487830fef9cde00b04de0078459aec7389f4b1d73b64693edc450d9492d945e1f182c18ec60c6d62966d0df7473ebb15f80281b30f35ec04d8d6461f27ca966b7b9e9d2ac3454d94928b779e9c31f141dcd0f365d6151e8c9fb855f802018e583abc3e373e1fd769f89ca65b9c564ce44bb043bf6ee7138a89a3514dcf94d8b3fb4fc63e5c0a1c98770a789efef0e9a73a4859d3d073e02867fc33aaef08ade0cb998b8bbe7019c5c4fb11cd48abecc59efe78df52e15502db3a1a6acb15ad6e75a00176bb1536ab44de79fb3d6ee2dd84befb411befb4008a720d9e9f357124aa19a959b2f3607f2c7c3b7060ce1630936c5de1f7ccdaed977fa7bed7d2889fffe239925218f7d6c0ac3e35a355c1df8f684642c1ab07fba3fb6f175e25c0f1fc93cdcdf74b7317573736e057af6f273915f4d0b98aa9ea0c175586a3114d4f14c92f7b06627fbc1378950025e48935ab1b167c17ea6bfdf8ed6f76d2748567effd4f63ffb95036e20afb75cfc9e85b770abf2af062e77dab2a9ab9e2af7d434867a7ab120a854b181e89c2e57268911946e22af9c3befef89bcb0107bebd0db7b5affc996e75fe3e96d7058b85c39bbf7b06d1481ca74e8f9662898c280a9658a5a2fd85c1f85bcfc9c4d872c1af0aecd8d2d833a648cf3306acf25b344329f056c932a2aa95b74d9e3b143e7121be9cd0b9c1030063e87452157e3b39a315957778420ffdf9a3af63770bba404037cc5d3e01a3ff387ee1ff029d1bdf00e03bd05442bdd47c0000000049454e44ae426082"))
+
+          root = Path.cwd()
+          verify = root / "preview/verify_crop_editor.mjs"
+          text = verify.read_text(encoding="utf-8")
+          needle = '  await reader.goto(`${base}/?opened=1#ordinary-days`, { waitUntil: "networkidle" });\n\n  const croppedPhoto ='
+          insert = '''  await reader.goto(`${base}/?opened=1#ordinary-days`, { waitUntil: "networkidle" });
+
+  const cursorState = await reader.evaluate(() => ({
+    finePointer: matchMedia("(hover: hover) and (pointer: fine)").matches,
+    bodyCursor: getComputedStyle(document.body).cursor,
+    openButtonCursor: getComputedStyle(document.getElementById("open-book")).cursor,
+    stylesheetLoaded: [...document.styleSheets].some((sheet) =>
+      String(sheet.href || "").includes("cursor-scrapbook-pencil-final-v19.css")
+    ),
+  }));
+  assert(cursorState.stylesheetLoaded, `custom cursor stylesheet was not loaded: ${JSON.stringify(cursorState)}`);
+  assert(cursorState.finePointer, `desktop Chromium did not expose a fine pointer: ${JSON.stringify(cursorState)}`);
+  assert(cursorState.bodyCursor.includes("scrapbook-pencil-final-v19"), `custom body cursor was not applied: ${JSON.stringify(cursorState)}`);
+  assert(cursorState.openButtonCursor.includes("scrapbook-pencil-final-v19"), `custom interactive cursor was not applied: ${JSON.stringify(cursorState)}`);
+
+  const croppedPhoto ='''
+          if "const cursorState =" not in text:
+              if needle not in text:
+                  raise SystemExit("cursor assertion insertion anchor not found")
+              text = text.replace(needle, insert)
+          report_needle = '  const report = {\n    photoPosition,'
+          if "  const report = {\n    cursorState," not in text:
+              if report_needle not in text:
+                  raise SystemExit("cursor report insertion anchor not found")
+              text = text.replace(report_needle, '  const report = {\n    cursorState,\n    photoPosition,')
+          verify.write_text(text, encoding="utf-8")
+
+          checklist = root / "REVIEW_ROUND_2_CHECKLIST.md"
+          current = checklist.read_text(encoding="utf-8")
+          if "## Кадрирование и кастомный курсор" not in current:
+              current += '''
+
+## Кадрирование и кастомный курсор
+
+- [ ] Навести курсор на фото, видео и Live Photo в Studio: появляется кнопка настройки кадра.
+- [ ] Перетащить фото внутри полароида, сохранить, открыть повторно и проверить сохранённое положение.
+- [ ] Изменить положение и нажать «Отмена»: предыдущее сохранённое положение не меняется.
+- [ ] Для видео выбрать кадр по таймлайну и проверить «Сохранить», «Сохранить и выйти» и «Отмена».
+- [ ] Для Live Photo доступно кадрирование статичного фото, но нет таймлайна обычного видео.
+- [ ] На десктопе книга использует оранжевый карандаш с hotspot на грифеле; в Studio остаётся системный курсор.
+- [ ] На тач-устройстве кастомный курсор не влияет на интерфейс.
+'''
+              checklist.write_text(current, encoding="utf-8")
+
+          verification = root / "preview/CROP_EDITOR_VERIFICATION.md"
+          current = verification.read_text(encoding="utf-8")
+          if "## Cursor verification" not in current:
+              current += '''
+
+## Cursor verification
+
+The focused Chromium test also verifies that the cursor stylesheet is loaded and that the pencil cursor is applied to the book and its interactive controls on fine-pointer devices. Studio intentionally keeps the system cursor.
+'''
+              verification.write_text(current, encoding="utf-8")
+
+          for rel in [
+              "preview/trigger-capture-visibility-fix.txt",
+              "preview/trigger-current-head-crop-verification.txt",
+              "tools/temporary_capture_visibility_patch.py",
+          ]:
+              path = root / rel
+              if path.exists():
+                  path.unlink()
           PY
 
-      - name: Commit PNG fallback
+      - name: Commit non-workflow cleanup
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/cursors/scrapbook-pencil-final-v19.png
+          git add -A -- ':!.github/workflows'
           if git diff --cached --quiet; then
-            echo "PNG fallback already present"
+            echo "No non-workflow changes"
           else
-            git commit -m "feat: add pencil cursor PNG fallback"
+            git commit -m "test: verify custom cursor and clean review helpers"
             git push origin HEAD:review-round-2-polish
           fi
