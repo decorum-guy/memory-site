@@ -45,9 +45,6 @@ jobs:
         with:
           ref: ${{ github.head_ref || github.ref_name }}
 
-      - name: Stabilize selected video frame verification
-        run: python preview/stabilize_video_frame_ci.py
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -151,16 +148,16 @@ jobs:
           rm -rf preview/demo-media node_modules package.json package-lock.json
           rm -f media/telegram/chat-* preview/capture.log
 
-      - name: Publish screenshots and verification fixes into current branch
+      - name: Publish screenshots into current branch
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f preview/screenshots preview/STATUS.md preview/capture.mjs preview/verify_crop_editor.mjs || true
+          git add -f preview/screenshots preview/STATUS.md || true
           if git diff --cached --quiet; then
             echo "No preview changes to publish"
           else
-            git commit -m "chore(preview): refresh screenshots and stabilize video verification [skip ci]"
+            git commit -m "chore(preview): refresh design screenshots [skip ci]"
             BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
             git push origin "HEAD:${BRANCH}"
           fi
