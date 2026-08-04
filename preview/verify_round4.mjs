@@ -4,6 +4,14 @@ const base = process.env.PREVIEW_URL || "http://127.0.0.1:4173";
 const browser = await chromium.launch({ headless: true });
 function assert(value, message) { if (!value) throw new Error(message); }
 
+async function downloadText(download) {
+  const stream = await download.createReadStream();
+  assert(stream, "Exported memories.js stream is unavailable");
+  let text = "";
+  for await (const chunk of stream) text += chunk.toString("utf8");
+  return text;
+}
+
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await page.goto(`${base}/?telegram=1&shared=1`, { waitUntil: "networkidle" });
@@ -71,7 +79,49 @@ try {
   await sound.click();
   assert(!(await page.locator("#lightbox-video").evaluate((video) => video.muted)), "Mute control did not restore Live Photo sound");
 
-  console.log(JSON.stringify({ activeFirst: true, yearLabels: true, censorshipWithoutScroll: true, adaptiveCaptions: true, liveSound: true }, null, 2));
+  const studio = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  await studio.goto(`${base}/tools/studio.html`, { waitUntil: "networkidle" });
+  await studio.locator("#book-settings").waitFor({ state: "visible" });
+  assert(await studio.locator('[data-meta-field="title"]').count() === 1, "Editable cover title field is missing");
+  assert(await studio.locator('[data-chapter-field="number"]').count() > 0, "Editable chapter year field is missing");
+  assert(await studio.locator('[data-chapter-field="kicker"]').count() > 0, "Editable chapter kicker field is missing");
+  assert(await studio.locator('[data-chapter-field="subtitle"]').count() > 0, "Editable chapter subtitle field is missing");
+
+  await studio.locator('[data-meta-field="title"]').fill("Редактируемая обложка");
+  await studio.locator('[data-meta-field="title"]').press("Tab");
+  await studio.locator('[data-meta-field="openLabel"]').fill("Открыть наши воспоминания");
+  await studio.locator('[data-meta-field="openLabel"]').press("Tab");
+
+  const changeChapterField = async (field, value) => {
+    const input = studio.locator(`[data-chapter-field="${field}"]`).first();
+    await input.fill(value);
+    await input.press("Tab");
+    await studio.waitForTimeout(60);
+  };
+  await changeChapterField("number", "2023");
+  await changeChapterField("kicker", "Глава, которую можно переименовать");
+  await changeChapterField("title", "Наш 2023");
+  await changeChapterField("subtitle", "Редактируемый текст под годом и заголовком.");
+
+  const downloadPromise = studio.waitForEvent("download");
+  await studio.locator("#export").click();
+  const exported = await downloadText(await downloadPromise);
+  assert(exported.includes('"title": "Редактируемая обложка"'), "Edited cover title did not reach exported memories.js");
+  assert(exported.includes('"openLabel": "Открыть наши воспоминания"'), "Edited cover button label did not reach exported memories.js");
+  assert(exported.includes('"number": "2023"'), "Edited chapter year did not reach exported memories.js");
+  assert(exported.includes('"kicker": "Глава, которую можно переименовать"'), "Edited chapter kicker did not reach exported memories.js");
+  assert(exported.includes('"title": "Наш 2023"'), "Edited chapter title did not reach exported memories.js");
+  assert(exported.includes('"subtitle": "Редактируемый текст под годом и заголовком."'), "Edited chapter subtitle did not reach exported memories.js");
+  await studio.close();
+
+  console.log(JSON.stringify({
+    activeFirst: true,
+    yearLabels: true,
+    censorshipWithoutScroll: true,
+    adaptiveCaptions: true,
+    liveSound: true,
+    editableBookMetadataExport: true,
+  }, null, 2));
 } finally {
   await browser.close();
 }
