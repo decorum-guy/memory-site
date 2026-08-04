@@ -1,1 +1,0 @@
-Apply visibility-aware selected-frame test.
