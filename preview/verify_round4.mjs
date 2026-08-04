@@ -28,20 +28,37 @@ try {
   await page.locator("#ordinary-days").scrollIntoViewIfNeeded();
   await page.waitForTimeout(160);
   const before = await page.evaluate(() => window.scrollY);
+  await page.evaluate(() => {
+    window.__censorScrollSamples = [window.scrollY];
+    window.__censorScrollListener = () => window.__censorScrollSamples.push(window.scrollY);
+    window.addEventListener("scroll", window.__censorScrollListener, { passive: true });
+  });
   const censor = page.locator(".reader-tools__button--censor");
+  const buttonBox = await censor.boundingBox();
   const iconBefore = await censor.locator(".reader-tools__icon").boundingBox();
+  assert(buttonBox && iconBefore && Math.abs((buttonBox.y + buttonBox.height / 2) - (iconBefore.y + iconBefore.height / 2)) < 1.5, "Censorship indicator is not vertically centered inside the button");
+
   await censor.click();
-  await page.waitForTimeout(80);
+  await page.waitForTimeout(120);
   const afterOff = await page.evaluate(() => window.scrollY);
   assert(Math.abs(afterOff - before) < 6, `Censorship toggle moved the page: ${before} -> ${afterOff}`);
   assert(!(await page.locator('[data-media-key="d04"]').evaluate((node) => node.classList.contains("is-censored"))), "Censored preview stayed hidden after in-place toggle");
+  const iconOn = await censor.locator(".reader-tools__icon").boundingBox();
+  const dotOn = await censor.locator(".reader-tools__icon i").boundingBox();
+  assert(iconOn && dotOn && Math.abs((iconOn.x + iconOn.width / 2) - (dotOn.x + dotOn.width / 2)) < 1 && Math.abs((iconOn.y + iconOn.height / 2) - (dotOn.y + dotOn.height / 2)) < 1, "Censorship dot is not centered inside its ring");
+
   await censor.click();
-  await page.waitForTimeout(80);
+  await page.waitForTimeout(120);
   const afterOn = await page.evaluate(() => window.scrollY);
   assert(Math.abs(afterOn - before) < 6, `Restoring censorship moved the page: ${before} -> ${afterOn}`);
   assert(await page.locator('[data-media-key="d04"]').evaluate((node) => node.classList.contains("is-censored")), "Censorship was not restored");
   const iconAfter = await censor.locator(".reader-tools__icon").boundingBox();
   assert(iconBefore && iconAfter && Math.abs(iconBefore.width - iconAfter.width) < .5 && Math.abs(iconBefore.height - iconAfter.height) < .5, "Censorship icon geometry changes between states");
+  const scrollTrace = await page.evaluate(() => {
+    window.removeEventListener("scroll", window.__censorScrollListener);
+    return window.__censorScrollSamples;
+  });
+  assert(scrollTrace.every((value) => Math.abs(value - before) < 6), `Censorship produced a transient scroll jump: ${JSON.stringify(scrollTrace)}`);
 
   await page.evaluate(() => {
     const captions = [...document.querySelectorAll(".event-preview__caption")];
@@ -82,6 +99,8 @@ try {
   const studio = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await studio.goto(`${base}/tools/studio.html`, { waitUntil: "networkidle" });
   await studio.locator("#book-settings").waitFor({ state: "visible" });
+  assert(await studio.locator(".studio-tabs a").count() === 2, "Memory Studio does not expose both Studio tabs");
+  assert((await studio.locator(".studio-tabs a.is-active").textContent())?.trim() === "Memory Studio", "Memory Studio tab is not active");
   assert(await studio.locator('[data-meta-field="title"]').count() === 1, "Editable cover title field is missing");
   assert(await studio.locator('[data-chapter-field="number"]').count() > 0, "Editable chapter year field is missing");
   assert(await studio.locator('[data-chapter-field="kicker"]').count() > 0, "Editable chapter kicker field is missing");
@@ -118,8 +137,10 @@ try {
     activeFirst: true,
     yearLabels: true,
     censorshipWithoutScroll: true,
+    censorshipIndicatorCentered: true,
     adaptiveCaptions: true,
     liveSound: true,
+    studioTabs: true,
     editableBookMetadataExport: true,
   }, null, 2));
 } finally {
