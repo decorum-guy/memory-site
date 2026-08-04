@@ -23,7 +23,7 @@ try {
   await quote.locator("select").selectOption("me");
   await quote.locator("textarea").fill("Тестовое сообщение от Артёма.");
   const fileInput = quote.locator("input[type=file]");
-  await fileInput.setInputFiles("preview/demo-media/chat-01.jpg");
+  await fileInput.setInputFiles("media/telegram/chat-05.jpg");
   await quote.locator(".shot-preview img").waitFor({ state: "visible" });
 
   await page.locator("#add-note").click();
