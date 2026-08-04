@@ -1,53 +1,67 @@
 window.TELEGRAM_MEDIA_MODES = {
   "media/telegram/chat-cutout-01.png": "cutout",
-  "media/telegram/chat-cutout-02.png": "cutout"
+  "media/telegram/chat-02.jpg": "paper"
 };
 window.TELEGRAM_CHAPTER = {
   id: "telegram",
   number: "TG",
-  kicker: "Несколько сообщений",
+  kicker: "Слова, которые остались",
   title: "То, что осталось в переписке",
-  subtitle: "Демонстрация большой Telegram-главы: обычные скриншоты, прозрачные вырезки и несколько scrapbook-разворотов.",
+  subtitle: "Записки и несколько сообщений, которые сами стали частью истории.",
   layout: "wide",
   theme: "blue",
   blocks: [
     {
       type: "note",
-      text: "Это временный набор для проверки дизайна. В финальной книге здесь будут только выбранные Артёмом фрагменты.",
+      telegramKind: "note",
+      text: "Это место не обязано быть архивом всего чата. Здесь можно оставить несколько слов, которые хочется сказать спокойно и без спешки.",
       style: "torn",
-      rotate: -1.2
-    },
-    {
-      type: "collage",
-      title: "Фрагменты переписки",
-      caption: "Обычные прямоугольные скриншоты и прозрачные PNG могут жить на одном развороте.",
-      photos: [
-        { src: "media/telegram/chat-01.jpg", alt: "Демо Telegram", caption: "Первый фрагмент." },
-        { src: "media/telegram/chat-cutout-01.png", alt: "Демо PNG-вырезка", caption: "Прозрачная вырезка без белого фона." },
-        { src: "media/telegram/chat-02.jpg", alt: "Демо Telegram", caption: "Второй фрагмент." },
-        { src: "media/telegram/chat-03.jpg", alt: "Демо Telegram", caption: "Третий фрагмент." },
-        { src: "media/telegram/chat-cutout-02.png", alt: "Демо PNG-вырезка", caption: "Ещё одна нестандартная форма." },
-        { src: "media/telegram/chat-04.jpg", alt: "Демо Telegram", caption: "Четвёртый фрагмент." },
-        { src: "media/telegram/chat-05.jpg", alt: "Демо Telegram", caption: "Пятый фрагмент." }
-      ]
-    },
-    {
-      type: "collage",
-      title: "Ещё несколько фрагментов · 2",
-      caption: "Большой импорт автоматически разбивается на дополнительные развороты.",
-      photos: [
-        { src: "media/telegram/chat-06.jpg", alt: "Демо Telegram", caption: "Шестой фрагмент." },
-        { src: "media/telegram/chat-07.jpg", alt: "Демо Telegram", caption: "Седьмой фрагмент." },
-        { src: "media/telegram/chat-08.jpg", alt: "Демо Telegram", caption: "Восьмой фрагмент." },
-        { src: "media/telegram/chat-09.jpg", alt: "Демо Telegram", caption: "Девятый фрагмент." },
-        { src: "media/telegram/chat-10.jpg", alt: "Демо Telegram", caption: "Десятый фрагмент." }
-      ]
+      shape: 1,
+      rotate: 0.75
     },
     {
       type: "quote",
-      text: "Здесь может остаться одна фраза, которую не нужно объяснять никому кроме вас.",
-      author: "из Telegram",
-      rotate: 1.1
+      telegramKind: "message",
+      text: "Ты опять сохранил эту фотографию?",
+      author: "Соня",
+      speaker: "sonya",
+      screenshot: "media/telegram/chat-cutout-01.png",
+      screenshotAlt: "Демонстрационный скриншот сообщения Сони",
+      screenshotMode: "cutout",
+      shape: 2,
+      rotate: -0.45
+    },
+    {
+      type: "quote",
+      telegramKind: "message",
+      text: "Конечно. Я же знал, что однажды соберу из этого целую книгу.",
+      author: "Артём",
+      speaker: "me",
+      screenshot: "",
+      screenshotAlt: "",
+      screenshotMode: "paper",
+      shape: 3,
+      rotate: 1.05
+    },
+    {
+      type: "quote",
+      telegramKind: "message",
+      text: "Тогда пусть здесь останется и эта фраза.",
+      author: "Соня",
+      speaker: "sonya",
+      screenshot: "media/telegram/chat-02.jpg",
+      screenshotAlt: "Демонстрационный скриншот сообщения Сони",
+      screenshotMode: "paper",
+      shape: 4,
+      rotate: -0.8
+    },
+    {
+      type: "note",
+      telegramKind: "note",
+      text: "А в конце главы можно оставить ещё одно напутствие — уже не как сообщение из прошлого, а как слова от тебя сейчас.",
+      style: "torn",
+      shape: 4,
+      rotate: -0.8
     }
   ]
 };
