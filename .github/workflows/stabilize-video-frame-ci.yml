@@ -1,0 +1,159 @@
+name: Stabilize selected video frame verification
+
+on:
+  push:
+    branches: [review-round-2-polish]
+    paths:
+      - ".github/workflows/stabilize-video-frame-ci.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review-round-2-polish
+          fetch-depth: 0
+
+      - name: Add decode-aware selected-frame waiting
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          robust_wait = '''await {locator}.evaluate((video, expected) => new Promise((resolve, reject) => {{
+  const started = performance.now();
+  const deadline = started + 15000;
+  const events = ["loadedmetadata", "loadeddata", "seeked", "timeupdate", "canplay"];
+  let timer = 0;
+  let nudging = false;
+  let settled = false;
+
+  const cleanup = () => {{
+    window.clearInterval(timer);
+    events.forEach((name) => video.removeEventListener(name, check));
+  }};
+
+  const finish = () => {{
+    if (settled) return;
+    settled = true;
+    cleanup();
+    video.pause();
+    resolve();
+  }};
+
+  const fail = () => {{
+    if (settled) return;
+    settled = true;
+    cleanup();
+    reject(new Error(`Timed out waiting for selected frame ${{expected}}; current=${{video.currentTime}}; readyState=${{video.readyState}}`));
+  }};
+
+  const nudgeDecode = async () => {{
+    if (nudging || video.readyState < 1 || settled) return;
+    nudging = true;
+    video.muted = true;
+    try {{ await video.play(); }} catch {{}}
+    try {{
+      if (typeof video.fastSeek === "function") video.fastSeek(expected);
+      else video.currentTime = expected;
+    }} catch {{}}
+    window.setTimeout(() => {{ nudging = false; }}, 300);
+  }};
+
+  const check = () => {{
+    if (video.readyState >= 2 && Math.abs(video.currentTime - expected) <= .35) {{
+      finish();
+      return;
+    }}
+    const now = performance.now();
+    if (now >= deadline) {{
+      fail();
+      return;
+    }}
+    if (now - started >= 3000) void nudgeDecode();
+  }};
+
+  events.forEach((name) => video.addEventListener(name, check));
+  timer = window.setInterval(check, 120);
+  check();
+}}), 1.2);'''
+
+          verify = Path("preview/verify_crop_editor.mjs")
+          text = verify.read_text(encoding="utf-8")
+          old = '''  const selectedVideo = reader.locator('[data-media-key="d05"] video').first();
+  await selectedVideo.scrollIntoViewIfNeeded();
+  await reader.waitForFunction(() => {
+    const video = document.querySelector('[data-media-key="d05"] video');
+    return Boolean(video && video.readyState >= 2 && Math.abs(video.currentTime - 1.2) <= .35);
+  }, null, { timeout: 15000 });'''
+          new = '''  const selectedVideo = reader.locator('[data-media-key="d05"] video').first();
+  await selectedVideo.waitFor({ state: "attached" });
+  await selectedVideo.scrollIntoViewIfNeeded();
+  ''' + robust_wait.format(locator="selectedVideo")
+          if old not in text and "const started = performance.now();" not in text:
+              raise SystemExit("focused verification selected-video block not found")
+          if old in text:
+              verify.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          capture = Path("preview/capture.mjs")
+          text = capture.read_text(encoding="utf-8")
+          old = '''await selectedVideoPreview.evaluate((video, expected) => new Promise((resolve, reject) => {
+  const deadline = performance.now() + 12000;
+  const check = () => {
+    if (Math.abs(video.currentTime - expected) <= .35 && video.readyState >= 2) {
+      resolve();
+      return;
+    }
+    if (performance.now() >= deadline) {
+      reject(new Error(`Timed out waiting for selected frame ${expected}; current=${video.currentTime}; readyState=${video.readyState}`));
+      return;
+    }
+    window.setTimeout(check, 80);
+  };
+  ["loadedmetadata", "loadeddata", "seeked", "timeupdate", "canplay"].forEach((name) => video.addEventListener(name, check));
+  check();
+}), 1.2);'''
+          new = robust_wait.format(locator="selectedVideoPreview")
+          if old not in text and "const started = performance.now();" not in text:
+              raise SystemExit("design capture selected-video block not found")
+          if old in text:
+              text = text.replace(old, new, 1)
+          old_state = '''const selectedVideoState = await selectedVideoPreview.evaluate((video) => ({
+  currentTime: video.currentTime,
+  objectPosition: getComputedStyle(video).objectPosition
+}));'''
+          new_state = '''const selectedVideoState = await selectedVideoPreview.evaluate((video) => ({
+  currentTime: video.currentTime,
+  objectPosition: getComputedStyle(video).objectPosition,
+  paused: video.paused
+}));'''
+          if old_state in text:
+              text = text.replace(old_state, new_state, 1)
+          pause_anchor = '''if (!selectedVideoState.objectPosition.includes("68%") || !selectedVideoState.objectPosition.includes("34%")) {
+  throw new Error(`Saved video crop was not applied: ${selectedVideoState.objectPosition}`);
+}'''
+          pause_check = pause_anchor + '''
+if (!selectedVideoState.paused) {
+  throw new Error("Selected video preview frame is still playing");
+}'''
+          if "Selected video preview frame is still playing" not in text:
+              if pause_anchor not in text:
+                  raise SystemExit("capture pause assertion anchor not found")
+              text = text.replace(pause_anchor, pause_check, 1)
+          capture.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Commit deterministic Chromium verification
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add preview/verify_crop_editor.mjs preview/capture.mjs
+          if git diff --cached --quiet; then
+            echo "Selected-frame waits already stabilized"
+          else
+            git commit -m "test: stabilize selected video frame decoding"
+            git push origin HEAD:review-round-2-polish
+          fi
