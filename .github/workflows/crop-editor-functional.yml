@@ -12,6 +12,7 @@ on:
       - "assets/cursors/**"
       - "tools/studio.html"
       - "preview/demo_memories.js"
+      - "preview/verify_cursor_states.mjs"
       - "preview/verify_crop_editor.mjs"
       - "preview/capture.mjs"
       - ".github/workflows/crop-editor-functional.yml"
@@ -65,6 +66,7 @@ jobs:
             curl --fail --silent http://127.0.0.1:4173/ >/dev/null && break
             sleep 1
           done
+          node preview/verify_cursor_states.mjs
           node preview/verify_crop_editor.mjs
 
       - uses: actions/upload-artifact@v4
