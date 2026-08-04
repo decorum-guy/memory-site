@@ -1,0 +1,88 @@
+name: Temporary crop editor apply
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "preview/trigger-crop-editor-apply.txt"
+      - ".github/workflows/temporary-crop-editor-apply.yml"
+      - "tools/.crop-editor-studio.b64"
+      - "tools/.crop-editor-rest.b64"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Decode and apply crop editor payload
+        run: |
+          python3 - <<'PY'
+          import base64
+          import gzip
+          import io
+          import tarfile
+          from pathlib import Path, PurePosixPath
+
+          root = Path.cwd()
+          studio_payload = root / "tools/.crop-editor-studio.b64"
+          rest_payload = root / "tools/.crop-editor-rest.b64"
+
+          studio = gzip.decompress(base64.b64decode(studio_payload.read_text(encoding="utf-8")))
+          (root / "tools/studio.html").write_bytes(studio)
+
+          expected = {
+              "assets/app.js",
+              "assets/media.css",
+              "preview/demo_memories.js",
+              "preview/capture.mjs",
+              "REVIEW_ROUND_2_CHECKLIST.md",
+          }
+          archive = gzip.decompress(base64.b64decode(rest_payload.read_text(encoding="utf-8")))
+          with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as tar:
+              names = {member.name for member in tar.getmembers() if member.isfile()}
+              if names != expected:
+                  raise SystemExit(f"Unexpected payload members: {sorted(names)}")
+              for member in tar.getmembers():
+                  path = PurePosixPath(member.name)
+                  if path.is_absolute() or ".." in path.parts:
+                      raise SystemExit(f"Unsafe archive path: {member.name}")
+              tar.extractall(root)
+          PY
+
+      - name: Static syntax checks
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          text = Path("tools/studio.html").read_text(encoding="utf-8")
+          blocks = re.findall(r"<script(?:\s[^>]*)?>([\s\S]*?)</script>", text, flags=re.I)
+          inline = "\n\n".join(block for block in blocks if block.strip())
+          if not inline.strip():
+              raise SystemExit("Studio inline JavaScript was not found")
+          Path("/tmp/studio-inline.js").write_text(inline, encoding="utf-8")
+          PY
+          node --check /tmp/studio-inline.js
+          node --check assets/app.js
+          node --check preview/capture.mjs
+          python3 -m py_compile tools/import_memories.py tools/studio_workflow.py
+
+      - name: Commit implementation
+        run: |
+          rm -f tools/.crop-editor-studio.b64 tools/.crop-editor-rest.b64
+          rm -f .github/workflows/temporary-source-export.yml preview/trigger-source-export.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add polaroid crop and video frame editor"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
