@@ -59,11 +59,65 @@ try {
   assert(photoPosition.includes("24%") && photoPosition.includes("72%"), `book ignored saved photo crop: ${photoPosition}`);
 
   const selectedVideo = reader.locator('[data-media-key="d05"] video').first();
+  await selectedVideo.waitFor({ state: "attached" });
   await selectedVideo.scrollIntoViewIfNeeded();
-  await reader.waitForFunction(() => {
-    const video = document.querySelector('[data-media-key="d05"] video');
-    return Boolean(video && video.readyState >= 2 && Math.abs(video.currentTime - 1.2) <= .35);
-  }, null, { timeout: 15000 });
+  await selectedVideo.evaluate((video, expected) => new Promise((resolve, reject) => {
+  const started = performance.now();
+  const deadline = started + 15000;
+  const events = ["loadedmetadata", "loadeddata", "seeked", "timeupdate", "canplay"];
+  let timer = 0;
+  let nudging = false;
+  let settled = false;
+
+  const cleanup = () => {
+    window.clearInterval(timer);
+    events.forEach((name) => video.removeEventListener(name, check));
+  };
+
+  const finish = () => {
+    if (settled) return;
+    settled = true;
+    cleanup();
+    video.pause();
+    resolve();
+  };
+
+  const fail = () => {
+    if (settled) return;
+    settled = true;
+    cleanup();
+    reject(new Error(`Timed out waiting for selected frame ${expected}; current=${video.currentTime}; readyState=${video.readyState}`));
+  };
+
+  const nudgeDecode = async () => {
+    if (nudging || video.readyState < 1 || settled) return;
+    nudging = true;
+    video.muted = true;
+    try { await video.play(); } catch {}
+    try {
+      if (typeof video.fastSeek === "function") video.fastSeek(expected);
+      else video.currentTime = expected;
+    } catch {}
+    window.setTimeout(() => { nudging = false; }, 300);
+  };
+
+  const check = () => {
+    if (video.readyState >= 2 && Math.abs(video.currentTime - expected) <= .35) {
+      finish();
+      return;
+    }
+    const now = performance.now();
+    if (now >= deadline) {
+      fail();
+      return;
+    }
+    if (now - started >= 3000) void nudgeDecode();
+  };
+
+  events.forEach((name) => video.addEventListener(name, check));
+  timer = window.setInterval(check, 120);
+  check();
+}), 1.2);
   const readerVideoState = await selectedVideo.evaluate((video) => ({
     currentTime: video.currentTime,
     objectPosition: getComputedStyle(video).objectPosition,
