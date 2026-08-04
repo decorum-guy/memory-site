@@ -90,11 +90,13 @@ await censorPage.close();
 
 // Regression for applying memories.js and reopening while the browser restores a deep scroll position.
 const chromeCheck = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
-await chromeCheck.goto(`${base}/${previewQuery}&opened=1#memory-book`, { waitUntil: "networkidle" });
+await chromeCheck.goto(`${base}/${previewQuery}&opened=1#ordinary-days`, { waitUntil: "networkidle" });
 await chromeCheck.locator("#ordinary-days").scrollIntoViewIfNeeded();
 await chromeCheck.waitForTimeout(180);
 await chromeCheck.reload({ waitUntil: "networkidle" });
-await chromeCheck.waitForTimeout(220);
+await settle(chromeCheck);
+await chromeCheck.locator("#ordinary-days").scrollIntoViewIfNeeded();
+await chromeCheck.waitForTimeout(320);
 const readerChromeRestored = await chromeCheck.evaluate(() => {
   const rail = document.querySelector("#chapter-rail");
   const tools = document.querySelector(".reader-tools");
@@ -133,9 +135,11 @@ if (await studio.locator(".item-preview.is-missing").count()) {
   throw new Error("Memory Studio contains broken photo or video previews");
 }
 await shot(studio, "18-memory-studio.png", { fullPage: false });
-const expandButton = studio.locator("[data-expand]").first();
+const expandButton = populatedChapter.locator("[data-expand]").first();
 await expandButton.click();
-await studio.waitForTimeout(100);
+const expandedCard = populatedChapter.locator(".item.is-expanded").first();
+await expandedCard.scrollIntoViewIfNeeded();
+await studio.waitForTimeout(140);
 await shot(studio, "19-memory-studio-expanded-caption.png", { fullPage: false });
 
 const singleEvent = desktop.locator("#ordinary-days .memory-block--event").first();
@@ -146,6 +150,10 @@ const eightEvent = desktop.locator("#journeys .memory-block--event").first();
 await eightEvent.scrollIntoViewIfNeeded();
 await desktop.waitForTimeout(120);
 await eightEvent.screenshot({ path: path.join(output, "21-eight-item-event.png"), animations: "disabled" });
+const rightmostItem = eightEvent.locator(".event-preview__item--8");
+await rightmostItem.hover();
+await desktop.waitForTimeout(120);
+await eightEvent.screenshot({ path: path.join(output, "22-eight-item-hover-layer.png"), animations: "disabled" });
 
 await browser.close();
 

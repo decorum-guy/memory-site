@@ -28,8 +28,9 @@ def open_path(path: Path) -> None:
         webbrowser.open(path.resolve().as_uri())
 
 
-def open_book(root: Path) -> None:
-    url = (root / "index.html").resolve().as_uri() + "?opened=1#memory-book"
+def open_book(root: Path, chapter_id: str = "memory-book") -> None:
+    safe_id = re.sub(r"[^A-Za-z0-9_-]", "-", chapter_id or "memory-book")
+    url = (root / "index.html").resolve().as_uri() + f"?opened=1#{safe_id}"
     if sys.platform == "darwin":
         subprocess.run(["open", url], check=False)
     else:
@@ -148,7 +149,9 @@ def command_apply(args: argparse.Namespace) -> int:
     print(f"Правки применены к {args.scope}: {target}")
     print(f"Резервная копия: {backup}")
     if args.open:
-        open_book(root)
+        chapters = book.get("chapters") or []
+        first_chapter_id = str((chapters[0] if chapters else {}).get("id") or "memory-book")
+        open_book(root, first_chapter_id)
     else:
         print(f"Открыть книгу: open \"{root / 'index.html'}\"")
     return 0
