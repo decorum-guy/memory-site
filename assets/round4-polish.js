@@ -102,8 +102,8 @@
 
     function captionSize(text) {
       const length = [...String(text || "").trim()].length;
-      if (length <= 18) return "short";
-      if (length <= 42) return "medium";
+      if (length <= 24) return "short";
+      if (length <= 34) return "medium";
       return "long";
     }
 
