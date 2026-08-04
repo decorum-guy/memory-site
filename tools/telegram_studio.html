@@ -103,14 +103,14 @@
 
     function renderNote(block,index){
       const article=shell(block,index,"Записка");
-      article.innerHTML+=`<div class="note-preview">Напутствие на рваной бумаге · форма ${(Number(block.shape)||0)+1}</div><label class="field"><span>Текст записки</span><textarea placeholder="Напиши здесь то, что хочешь оставить ей…">${esc(block.text||"")}</textarea></label>`;
+      article.insertAdjacentHTML("beforeend", `<div class="note-preview">Напутствие на рваной бумаге · форма ${(Number(block.shape)||0)+1}</div><label class="field"><span>Текст записки</span><textarea placeholder="Напиши здесь то, что хочешь оставить ей…">${esc(block.text||"")}</textarea></label>`);
       article.querySelector("textarea").addEventListener("input",event=>block.text=event.target.value);
       return article;
     }
 
     function renderQuote(block,index){
       const article=shell(block,index,"Цитата сообщения");
-      article.innerHTML+=`<div class="quote-grid"><div class="quote-card ${block.speaker==="sonya"?"sonya":"me"}"><label class="field"><span>Чья цитата</span><select><option value="sonya"${block.speaker==="sonya"?" selected":""}>Соня — акцентный цвет</option><option value="me"${block.speaker==="me"?" selected":""}>Артём — синий цвет</option></select></label><label class="field"><span>Текст сообщения</span><textarea placeholder="Текст сообщения…">${esc(block.text||"")}</textarea></label></div><div class="shot"><div class="shot-preview ${block.screenshot?"":"is-empty"}">${block.screenshot?`<img src="../${escAttr(block.screenshot)}" alt="" />`:"Скрин сообщения необязателен"}</div><div class="shot-tools"><button type="button" data-upload>${block.screenshot?"Заменить скрин":"Добавить скрин"}</button>${block.screenshot?'<button class="remove-shot" type="button" data-remove-shot>Убрать скрин</button>':""}<input class="hidden-file" type="file" accept="image/png,image/jpeg,image/webp" /></div></div></div>`;
+      article.insertAdjacentHTML("beforeend", `<div class="quote-grid"><div class="quote-card ${block.speaker==="sonya"?"sonya":"me"}"><label class="field"><span>Чья цитата</span><select><option value="sonya"${block.speaker==="sonya"?" selected":""}>Соня — акцентный цвет</option><option value="me"${block.speaker==="me"?" selected":""}>Артём — синий цвет</option></select></label><label class="field"><span>Текст сообщения</span><textarea placeholder="Текст сообщения…">${esc(block.text||"")}</textarea></label></div><div class="shot"><div class="shot-preview ${block.screenshot?"":"is-empty"}">${block.screenshot?`<img src="../${escAttr(block.screenshot)}" alt="" />`:"Скрин сообщения необязателен"}</div><div class="shot-tools"><button type="button" data-upload>${block.screenshot?"Заменить скрин":"Добавить скрин"}</button>${block.screenshot?'<button class="remove-shot" type="button" data-remove-shot>Убрать скрин</button>':""}<input class="hidden-file" type="file" accept="image/png,image/jpeg,image/webp" /></div></div></div>`);
       const select=article.querySelector("select"),textarea=article.querySelector("textarea"),file=article.querySelector("input[type=file]");
       select.addEventListener("change",event=>{block.speaker=event.target.value;render()});
       textarea.addEventListener("input",event=>block.text=event.target.value);
