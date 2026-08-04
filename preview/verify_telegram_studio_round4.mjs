@@ -7,6 +7,9 @@ try {
   page.setDefaultTimeout(20000);
   await page.goto(`${base}/tools/telegram_studio.html`, { waitUntil: "networkidle" });
   await page.locator("#status").filter({ hasText: "Готово" }).waitFor();
+  assert(await page.locator(".studio-tabs a").count() === 2, "Telegram Studio does not expose both Studio tabs");
+  assert((await page.locator(".studio-tabs a.is-active").textContent())?.trim() === "Telegram Studio", "Telegram Studio tab is not active");
+
   await page.locator("#kicker").fill("Новая редактируемая фраза над заголовком");
   await page.locator("#add-note").click();
   const first = page.locator(".block").last();
@@ -34,9 +37,38 @@ try {
 
   await page.locator("#save").click();
   await page.locator("#status").filter({ hasText: "Сохранено" }).waitFor();
-  const state = await page.evaluate(async () => (await fetch("/api/telegram/state", { cache: "no-store" })).json());
+  const state = await page.evaluate(async () => (await fetch(`/api/telegram/state?verify=${Date.now()}`, { cache: "no-store" })).json());
   assert(state.kicker === "Новая редактируемая фраза над заголовком", "Editable Telegram kicker was not persisted");
   const savedNotes = state.blocks.filter((block) => block.type === "note").slice(-2);
   assert(savedNotes[0]?.layout === "left" && savedNotes[1]?.layout === "right", `Note placement was not persisted: ${JSON.stringify(savedNotes)}`);
-  console.log(JSON.stringify({ liveShapePreview: true, pairedNotes: true, reloadConfirmation: true, editableKicker: true }, null, 2));
+
+  const reader = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  let telegramResponse = null;
+  reader.on("response", (response) => {
+    if (new URL(response.url()).pathname === "/content/telegram.js") telegramResponse = response;
+  });
+  await reader.goto(`${base}/index.html?telegram=1&opened=1&verify=${Date.now()}#telegram`, { waitUntil: "networkidle" });
+  await reader.locator("#telegram .telegram-note").first().waitFor({ state: "visible" });
+  const renderedNotes = reader.locator("#telegram .telegram-note");
+  assert(await renderedNotes.count() >= 2, "Saved Telegram notes did not reach the reader preview");
+  const renderedLeft = renderedNotes.filter({ hasText: "Короткая записка" });
+  const renderedRight = renderedNotes.filter({ hasText: "Вторая короткая" });
+  assert(await renderedLeft.evaluate((node) => node.classList.contains("telegram-note--layout-left")), "Left note layout was not applied in reader preview");
+  assert(await renderedRight.evaluate((node) => node.classList.contains("telegram-note--layout-right")), "Right note layout was not applied in reader preview");
+  const leftBox = await renderedLeft.boundingBox();
+  const rightBox = await renderedRight.boundingBox();
+  assert(leftBox && rightBox && Math.abs(leftBox.y - rightBox.y) < Math.max(leftBox.height, rightBox.height) * .55, "Saved left/right notes are not on the same level in reader preview");
+  assert(telegramResponse, "Reader did not request content/telegram.js");
+  assert((await telegramResponse.headerValue("cache-control"))?.includes("no-store"), "Telegram chapter response can still be served from stale browser cache");
+  await reader.close();
+
+  console.log(JSON.stringify({
+    studioTabs: true,
+    liveShapePreview: true,
+    pairedNotes: true,
+    reloadConfirmation: true,
+    editableKicker: true,
+    savedNotesVisibleInReader: true,
+    telegramPreviewNoCache: true,
+  }, null, 2));
 } finally { await browser.close(); }
