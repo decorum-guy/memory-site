@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="64"
+     height="64"
+     viewBox="0 0 64 64"
+     fill="none">
+<title>Scrapbook pencil cursor — active, aligned hotspot</title>
+<g transform="matrix(1.26 0 0 1.26 0.620612 4.575990)">
+<g clip-path="url(#clip0_603_105)">
+<path d="M8.86973 34.6237L11.946 22.5799L20.6636 30.6743L8.86973 34.6237Z" fill="#EBC990" stroke="#57391F" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M9.03126 34.4635L11.2178 29.3818L13.9787 31.7563L9.03126 34.4635Z" fill="#302B27" stroke="#302B27" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12.0991 22.3563L27.9397 6.43469L36.3226 14.4128L20.8172 30.45L12.0991 22.3563Z" fill="#E7832D" stroke="#57391F" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M14.7471 23.5125L29.1193 9.11719L30.9693 10.9672L16.6549 25.4203L14.7471 23.5125Z" fill="#F8B14E"/>
+<path opacity="0.48" d="M18.2158 27.2703L33.7211 11.7534L36.3227 14.4128L20.8174 30.45L18.2158 27.2703Z" fill="#B95D20"/>
+<path d="M25.9741 8.41188L29.096 5.29001L37.421 13.2681L34.2413 16.5056L25.9741 8.41188Z" fill="#C9B89D" stroke="#57391F" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M38.0338 12.6438L41.4447 9.16344C41.8841 8.71636 41.8802 8.26928 41.4332 7.82219L34.5535 1.08126C34.0987 0.634173 33.6516 0.638027 33.2122 1.09282L29.8013 4.57313C29.3619 5.02021 29.3658 5.4673 29.8128 5.91438L36.6925 12.6553C37.1473 13.0947 37.5944 13.0908 38.0338 12.6438Z" fill="#D9745E" stroke="#57391F" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+<g opacity="0.5">
+<path d="M16.1924 24.7266L28.4139 12.2622" stroke="#7B4A24" stroke-width="0.34" stroke-linecap="round"/>
+<path d="M18.5625 25.5937L30.125 14.0312" stroke="#7B4A24" stroke-width="0.34" stroke-linecap="round"/>
+</g>
+<g opacity="0.78" clip-path="url(#clip1_603_105)">
+<path d="M2.67062 32.0833L9.05448 35.3521L12.5489 29.0889C12.9604 28.3515 13.0564 27.4913 12.8158 26.6977L12.7751 26.5634C12.2966 24.9849 10.5826 24.1073 8.94677 24.6032C8.04693 24.8759 7.31557 25.5286 6.95899 26.377L6.59579 27.2411L5.81391 26.7241C5.04629 26.2165 4.07564 26.0797 3.17584 26.3525C1.53999 26.8484 0.601764 28.53 1.08026 30.1085L1.12094 30.2427C1.36151 31.0364 1.91895 31.6984 2.67062 32.0833Z" fill="#FF006A"/>
+</g>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_603_105">
+<rect width="43" height="38" fill="white"/>
+</clipPath>
+<clipPath id="clip1_603_105">
+<rect width="12.2203" height="11.792" fill="white" transform="translate(0 26.5451) rotate(-16.8636)"/>
+</clipPath>
+</defs>
+</svg>
