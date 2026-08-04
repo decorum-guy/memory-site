@@ -541,14 +541,20 @@
   }
 
   function restoreReaderChrome() {
+    const params = new URLSearchParams(window.location.search);
+    const forcedOpen = params.get("opened") === "1" || window.location.hash === "#memory-book";
     const update = () => {
       const cover = byId("cover");
       const threshold = cover ? Math.min(160, cover.offsetHeight * .12) : 80;
-      if (window.scrollY > threshold || window.location.hash) document.body.classList.add("book-opened");
+      if (forcedOpen || window.scrollY > threshold || window.location.hash) {
+        document.body.classList.add("book-opened");
+      }
     };
     update();
+    [80, 250, 700, 1500].forEach((delay) => window.setTimeout(update, delay));
     window.addEventListener("scroll", update, { passive: true });
     window.addEventListener("pageshow", () => requestAnimationFrame(update));
+    window.addEventListener("hashchange", update);
   }
 
   function revealPreviewCopies(item) {

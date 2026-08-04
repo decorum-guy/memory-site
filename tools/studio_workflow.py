@@ -28,6 +28,14 @@ def open_path(path: Path) -> None:
         webbrowser.open(path.resolve().as_uri())
 
 
+def open_book(root: Path) -> None:
+    url = (root / "index.html").resolve().as_uri() + "?opened=1#memory-book"
+    if sys.platform == "darwin":
+        subprocess.run(["open", url], check=False)
+    else:
+        webbrowser.open(url)
+
+
 def extract_book(path: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
     match = re.search(r"window\.MEMORY_BOOK\s*=\s*([\s\S]*);\s*$", text)
@@ -140,7 +148,7 @@ def command_apply(args: argparse.Namespace) -> int:
     print(f"Правки применены к {args.scope}: {target}")
     print(f"Резервная копия: {backup}")
     if args.open:
-        open_path(root / "index.html")
+        open_book(root)
     else:
         print(f"Открыть книгу: open \"{root / 'index.html'}\"")
     return 0

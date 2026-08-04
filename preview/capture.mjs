@@ -90,8 +90,7 @@ await censorPage.close();
 
 // Regression for applying memories.js and reopening while the browser restores a deep scroll position.
 const chromeCheck = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
-await chromeCheck.goto(`${base}/${previewQuery}`, { waitUntil: "networkidle" });
-await chromeCheck.locator("#open-book").click();
+await chromeCheck.goto(`${base}/${previewQuery}&opened=1#memory-book`, { waitUntil: "networkidle" });
 await chromeCheck.locator("#ordinary-days").scrollIntoViewIfNeeded();
 await chromeCheck.waitForTimeout(180);
 await chromeCheck.reload({ waitUntil: "networkidle" });
