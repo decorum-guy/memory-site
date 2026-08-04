@@ -1,0 +1,29 @@
+name: Export current Studio source
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/export-current-studio.yml"
+      - "preview/trigger-current-studio-export.txt"
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: current-studio-source
+          path: |
+            tools/studio.html
+            assets/app.js
+            assets/media.css
+            preview/demo_memories.js
+            preview/verify_crop_editor.mjs
+          retention-days: 2
