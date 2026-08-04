@@ -1,0 +1,27 @@
+name: Temporary Studio UX fix
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "preview/trigger-studio-ux-fix.txt"
+      - "tools/temporary_studio_ux_patch.py"
+      - ".github/workflows/temporary-studio-ux-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - run: python3 tools/temporary_studio_ux_patch.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/studio.html tools/studio_workflow.py preview/capture.mjs
+          git commit -m "fix: preserve Studio context while editing"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
