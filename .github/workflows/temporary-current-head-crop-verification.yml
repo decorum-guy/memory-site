@@ -1,11 +1,12 @@
 name: Temporary current-head crop verification
 
 on:
-  pull_request:
-    branches: [main]
+  push:
+    branches: [review-round-2-polish]
     paths:
       - ".github/workflows/temporary-current-head-crop-verification.yml"
       - "preview/trigger-current-head-crop-verification.txt"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
+          ref: review-round-2-polish
           fetch-depth: 0
 
       - uses: actions/setup-python@v5
