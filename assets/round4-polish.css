@@ -121,6 +121,16 @@
 #telegram .telegram-note--layout-left { grid-column: 1 / span 6; justify-self: start; }
 #telegram .telegram-note--layout-right { grid-column: 7 / span 6; justify-self: end; }
 
+/* Keep the decorative opening quotation inside its quote card. */
+.memory-quote > span {
+  top: .12rem;
+  line-height: .82;
+}
+#telegram .telegram-message__quote > span {
+  top: .28rem;
+  line-height: .78;
+}
+
 @media (max-width: 760px) {
   .chapter-heading__number { min-width: 3.5rem; font-size: .64rem; }
   .chapter-rail a span { width: 2.25rem; height: 2.25rem; font-size: .5rem; }
