@@ -79,21 +79,38 @@ await desktop.locator("#ordinary-days").scrollIntoViewIfNeeded();
 await desktop.waitForTimeout(250);
 await shot(desktop, "12-global-censorship-off.png", { fullPage: false });
 
+// Regression for applying memories.js and reopening while the browser restores a deep scroll position.
+const chromeCheck = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
+await chromeCheck.goto(`${base}/${previewQuery}`, { waitUntil: "networkidle" });
+await chromeCheck.locator("#open-book").click();
+await chromeCheck.locator("#ordinary-days").scrollIntoViewIfNeeded();
+await chromeCheck.waitForTimeout(180);
+await chromeCheck.reload({ waitUntil: "networkidle" });
+await chromeCheck.waitForTimeout(220);
+const readerChromeRestored = await chromeCheck.evaluate(() => {
+  const rail = document.querySelector("#chapter-rail");
+  const tools = document.querySelector(".reader-tools");
+  return document.body.classList.contains("book-opened") && Boolean(rail) && Boolean(tools);
+});
+if (!readerChromeRestored) throw new Error("Reader chrome was not restored after a deep reload");
+await shot(chromeCheck, "13-reader-chrome-after-deep-reload.png", { fullPage: false });
+await chromeCheck.close();
+
 const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
 await mobile.goto(`${base}/${previewQuery}`, { waitUntil: "networkidle" });
 await settle(mobile);
-await shot(mobile, "13-cover-mobile.png", { fullPage: false });
+await shot(mobile, "14-cover-mobile.png", { fullPage: false });
 await mobile.locator("#open-book").click();
 await mobile.locator("#ordinary-days").scrollIntoViewIfNeeded();
 await mobile.waitForTimeout(220);
-await shot(mobile, "14-event-mobile.png", { fullPage: false });
+await shot(mobile, "15-event-mobile.png", { fullPage: false });
 const telegramMobile = mobile.locator("#telegram .memory-block--collage").first();
 await telegramMobile.scrollIntoViewIfNeeded();
 await mobile.waitForTimeout(180);
-await telegramMobile.screenshot({ path: path.join(output, "15-telegram-mobile.png"), animations: "disabled" });
+await telegramMobile.screenshot({ path: path.join(output, "16-telegram-mobile.png"), animations: "disabled" });
 await mobile.locator("#shared-album").scrollIntoViewIfNeeded();
 await mobile.waitForTimeout(180);
-await shot(mobile, "16-shared-album-mobile.png", { fullPage: false });
+await shot(mobile, "17-shared-album-mobile.png", { fullPage: false });
 
 const studio = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
 await studio.goto(`${base}/tools/studio.html`, { waitUntil: "networkidle" });
@@ -102,20 +119,20 @@ const populatedChapter = studio.locator("details.chapter").nth(1);
 await populatedChapter.evaluate((element) => { element.open = true; });
 await populatedChapter.scrollIntoViewIfNeeded();
 await studio.waitForTimeout(350);
-await shot(studio, "17-memory-studio.png", { fullPage: false });
+await shot(studio, "18-memory-studio.png", { fullPage: false });
 const expandButton = studio.locator("[data-expand]").first();
 await expandButton.click();
 await studio.waitForTimeout(100);
-await shot(studio, "18-memory-studio-expanded-caption.png", { fullPage: false });
+await shot(studio, "19-memory-studio-expanded-caption.png", { fullPage: false });
 
 const singleEvent = desktop.locator("#ordinary-days .memory-block--event").first();
 await singleEvent.scrollIntoViewIfNeeded();
 await desktop.waitForTimeout(120);
-await singleEvent.screenshot({ path: path.join(output, "19-single-row-event.png"), animations: "disabled" });
+await singleEvent.screenshot({ path: path.join(output, "20-single-row-event.png"), animations: "disabled" });
 const eightEvent = desktop.locator("#journeys .memory-block--event").first();
 await eightEvent.scrollIntoViewIfNeeded();
 await desktop.waitForTimeout(120);
-await eightEvent.screenshot({ path: path.join(output, "20-eight-item-event.png"), animations: "disabled" });
+await eightEvent.screenshot({ path: path.join(output, "21-eight-item-event.png"), animations: "disabled" });
 
 await browser.close();
 
