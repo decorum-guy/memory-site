@@ -83,6 +83,7 @@ if "article.innerHTML+=" in studio_text:
     )
     if count != 2:
         raise SystemExit(f"Expected to patch two Telegram Studio renderers, patched {count}")
-    studio.write_text(studio_text, encoding="utf-8")
+studio_text = studio_text.replace("shape:state.blocks.length%5", "shape:Math.floor(Math.random()*5)")
+studio.write_text(studio_text, encoding="utf-8")
 
 print("Round 3 style and Studio patch applied")
