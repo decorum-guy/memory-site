@@ -241,6 +241,24 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         print(f"[Telegram Studio] {format % args}")
 
+    def end_headers(self) -> None:
+        path = self.path.split("?", 1)[0]
+        no_cache = (
+            path.startswith("/api/telegram/")
+            or path in {
+                "/index.html",
+                "/tools/studio.html",
+                "/tools/telegram_studio.html",
+                "/content/telegram.js",
+                "/content/telegram-data.json",
+            }
+        )
+        if no_cache:
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+        super().end_headers()
+
     def send_json(self, value: Any, status: int = 200) -> None:
         payload = json.dumps(value, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
@@ -256,17 +274,18 @@ class Handler(SimpleHTTPRequestHandler):
         return json.loads(self.rfile.read(length).decode("utf-8"))
 
     def do_GET(self) -> None:
-        if self.path == "/api/telegram/state":
+        if self.path.split("?", 1)[0] == "/api/telegram/state":
             self.send_json(load_state())
             return
         super().do_GET()
 
     def do_POST(self) -> None:
+        path = self.path.split("?", 1)[0]
         try:
-            if self.path == "/api/telegram/upload":
+            if path == "/api/telegram/upload":
                 self.handle_upload()
                 return
-            if self.path == "/api/telegram/save":
+            if path == "/api/telegram/save":
                 state = write_state(self.read_json())
                 notes = sum(1 for block in state["blocks"] if block["type"] == "note")
                 quotes = sum(1 for block in state["blocks"] if block["type"] == "quote")
@@ -314,6 +333,7 @@ def main() -> int:
     url = f"http://{HOST}:{PORT}/tools/telegram_studio.html"
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"Telegram Studio: {url}")
+    print("Memory Studio:  " + f"http://{HOST}:{PORT}/tools/studio.html")
     print("Работает только локально. Для остановки нажми Ctrl+C.")
     threading.Timer(0.7, lambda: webbrowser.open(url)).start()
     try:
