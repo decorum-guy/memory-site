@@ -17,13 +17,12 @@
   const queryCensorshipOff = params.get("censor") === "off";
   const sessionCensorshipOff = safeSessionGet(storageKey) === "1";
   const defaultOff = settings.censorshipEnabledByDefault === false;
-  const censorshipOff = queryCensorshipOff || sessionCensorshipOff || defaultOff;
-  const censoredCount = countCensored(book);
+  let censorshipOff = queryCensorshipOff || sessionCensorshipOff || defaultOff;
+  const censoredItems = collectCensored(book);
+  const censoredCount = censoredItems.length;
 
-  if (censorshipOff) {
-    revealAllInData(book);
-    document.documentElement.classList.add("censorship-off");
-  }
+  window.MEMORY_CENSORED_ITEMS = censoredItems;
+  applyCensorshipState(censorshipOff, false);
 
   document.addEventListener("DOMContentLoaded", function () {
     renderSharedAlbum();
@@ -36,26 +35,26 @@
     const censorButton = document.createElement("button");
     censorButton.type = "button";
     censorButton.className = "reader-tools__button reader-tools__button--censor";
-    censorButton.setAttribute("aria-pressed", censorshipOff ? "true" : "false");
-    censorButton.innerHTML = censorshipOff
-      ? "<span>◉</span><strong>Вернуть цензуру</strong>"
-      : `<span>◌</span><strong>Показать всё скрытое${censoredCount ? ` · ${censoredCount}` : ""}</strong>`;
+    updateCensorButton(censorButton);
     censorButton.addEventListener("click", function () {
+      censorshipOff = !censorshipOff;
+      if (censorshipOff) safeSessionSet(storageKey, "1");
+      else safeSessionRemove(storageKey);
+
       const nextUrl = new URL(window.location.href);
-      if (censorshipOff) {
-        safeSessionRemove(storageKey);
-        nextUrl.searchParams.delete("censor");
-      } else {
-        safeSessionSet(storageKey, "1");
-        nextUrl.searchParams.set("censor", "off");
-      }
-      window.location.href = nextUrl.toString();
+      if (censorshipOff) nextUrl.searchParams.set("censor", "off");
+      else nextUrl.searchParams.delete("censor");
+      try { window.history.replaceState(null, "", nextUrl.toString()); }
+      catch (_) { /* file:// and older browsers still keep the in-memory state */ }
+
+      applyCensorshipState(censorshipOff, true);
+      updateCensorButton(censorButton);
     });
 
     const topButton = document.createElement("button");
     topButton.type = "button";
     topButton.className = "reader-tools__button reader-tools__button--top";
-    topButton.innerHTML = "<span>↑</span><strong>К обложке</strong>";
+    topButton.innerHTML = "<span aria-hidden=\"true\">↑</span><strong>К обложке</strong>";
     topButton.addEventListener("click", function () {
       document.getElementById("cover")?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth" });
     });
@@ -63,6 +62,22 @@
     controls.append(censorButton, topButton);
     document.body.appendChild(controls);
   });
+
+  function updateCensorButton(button) {
+    button.setAttribute("aria-pressed", censorshipOff ? "true" : "false");
+    button.innerHTML = censorshipOff
+      ? '<span class="reader-tools__icon" aria-hidden="true"></span><strong>Вернуть цензуру</strong>'
+      : `<span class="reader-tools__icon" aria-hidden="true"></span><strong>Показать всё скрытое${censoredCount ? ` · ${censoredCount}` : ""}</strong>`;
+  }
+
+  function applyCensorshipState(off, notify) {
+    censoredItems.forEach((item) => { item.censored = !off; });
+    window.MEMORY_CENSORSHIP_OFF = off;
+    document.documentElement.classList.toggle("censorship-off", off);
+    if (notify) {
+      document.dispatchEvent(new CustomEvent("memory:censorship-change", { detail: { off } }));
+    }
+  }
 
   function renderSharedAlbum() {
     const previewMode = params.get("shared") === "1";
@@ -114,18 +129,12 @@
     }
   }
 
-  function countCensored(value) {
-    let count = 0;
+  function collectCensored(value) {
+    const items = [];
     walkMedia(value, function (item) {
-      if (item.censored === true) count += 1;
+      if (item.censored === true) items.push(item);
     });
-    return count;
-  }
-
-  function revealAllInData(value) {
-    walkMedia(value, function (item) {
-      item.censored = false;
-    });
+    return items;
   }
 
   function walkMedia(value, visitor) {
@@ -158,7 +167,7 @@
   }
 
   function escapeHtml(value) {
-    return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;");
   }
 
   function escapeAttr(value) {
