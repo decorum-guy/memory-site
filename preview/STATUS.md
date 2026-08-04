@@ -1,23 +1,18 @@
 # Design Preview Status
 
-- Commit: `3e5082737688135a11dab63fb78c857ef4a73bed`
-- Run: https://github.com/decorum-guy/memory-site/actions/runs/30864167210
-- Generated: 2026-08-04 00:03:36 UTC
+- Commit: `fcaea178958d0a4a2e597949433699ae6c8e7a23`
+- Run: https://github.com/decorum-guy/memory-site/actions/runs/30864487914
+- Generated: 2026-08-04 00:08:34 UTC
 - Result: **failure**
 
 ## Последние строки ошибки
 ```text
-node:internal/modules/run_main:123
-    triggerUncaughtException(
-    ^
+file:///home/runner/work/memory-site/memory-site/preview/capture.mjs:106
+if (!readerChromeRestored) throw new Error("Reader chrome was not restored after a deep reload");
+                                 ^
 
-locator.scrollIntoViewIfNeeded: Timeout 30000ms exceeded.
-Call log:
-  - waiting for locator('.image-frame.is-censored').first()
-
-    at /home/runner/work/memory-site/memory-site/preview/capture.mjs:70:21 {
-  name: 'TimeoutError'
-}
+Error: Reader chrome was not restored after a deep reload
+    at file:///home/runner/work/memory-site/memory-site/preview/capture.mjs:106:34
 
 Node.js v20.20.2
 ```
