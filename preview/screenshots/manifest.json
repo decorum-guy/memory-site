@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-04T00:14:12.164Z",
+  "generatedAt": "2026-08-04T00:21:27.679Z",
   "files": [
     "01-cover-desktop.png",
     "02-book-full-desktop.png",
@@ -21,6 +21,7 @@
     "18-memory-studio.png",
     "19-memory-studio-expanded-caption.png",
     "20-single-row-event.png",
-    "21-eight-item-event.png"
+    "21-eight-item-event.png",
+    "22-eight-item-hover-layer.png"
   ]
 }
