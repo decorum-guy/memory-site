@@ -1,0 +1,65 @@
+name: Apply round 4 UX polish
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [review-round-2-polish]
+    paths:
+      - "preview/apply_round4_polish.py"
+      - ".github/workflows/apply-round4-polish.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-round4-polish
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review-round-2-polish
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply patch
+        run: python preview/apply_round4_polish.py
+
+      - name: Basic syntax checks
+        run: |
+          python -m py_compile tools/import_memories.py tools/telegram_server.py
+          node --check assets/app.js
+          node --check assets/preferences.js
+          node --check assets/round4-polish.js
+          node --check tools/studio-round4.js
+          node --check preview/verify_round4.mjs
+          node --check preview/verify_telegram_studio_round4.mjs
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          for path in [Path("tools/telegram_studio.html"), Path("tools/studio.html")]:
+              text = path.read_text(encoding="utf-8")
+              scripts = re.findall(r"<script(?:\s[^>]*)?>\s*([\s\S]*?)\s*</script>", text)
+              for index, script in enumerate(scripts):
+                  if script.strip():
+                      Path(f"/tmp/{path.stem}-{index}.js").write_text(script, encoding="utf-8")
+          PY
+          for file in /tmp/telegram_studio-*.js /tmp/studio-*.js; do
+            [ -f "$file" ] && node --check "$file"
+          done
+
+      - name: Commit branch changes
+        run: |
+          rm -f preview/apply_round4_polish.py .github/workflows/apply-round4-polish.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: finish round 4 UX polish"
+          git push origin HEAD:review-round-2-polish
