@@ -7,9 +7,9 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function shapeNumber(text) {
-  const match = String(text || "").match(/форма\s+(\d+)/i);
-  return match ? Number(match[1]) - 1 : null;
+function shapeNumber(className) {
+  const match = String(className || "").match(/note-preview--shape-(\d+)/i);
+  return match ? Number(match[1]) : null;
 }
 
 try {
@@ -21,10 +21,11 @@ try {
   await page.locator("#add-note").click();
   const note = page.locator(".block").last();
   await note.locator("textarea").fill("Моя тестовая записка для Сони.");
-  const initialShape = shapeNumber(await note.locator(".note-preview").textContent());
+  const initialShape = shapeNumber(await note.locator(".note-preview").getAttribute("class"));
   await note.locator("[data-shape]").click();
-  const changedShape = shapeNumber(await page.locator(".block").first().locator(".note-preview").textContent());
-  assert(Number.isInteger(initialShape) && Number.isInteger(changedShape), "Could not read torn-paper shape numbers");
+  const changedNote = page.locator(".block").first();
+  const changedShape = shapeNumber(await changedNote.locator(".note-preview").getAttribute("class"));
+  assert(Number.isInteger(initialShape) && Number.isInteger(changedShape), "Could not read torn-paper shape classes");
   assert(changedShape !== initialShape, `Shape control did not change the edge: ${initialShape} -> ${changedShape}`);
 
   await page.locator("#add-quote").click();
