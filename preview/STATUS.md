@@ -1,8 +1,8 @@
 # Design Preview Status
 
-- Commit: `c1ef2cbfece7a4bab40866a7dc57f7cfdb782b8f`
-- Run: https://github.com/decorum-guy/memory-site/actions/runs/30885972616
-- Generated: 2026-08-04 07:01:58 UTC
+- Commit: `c2c76a2790656966283773b04c1457fb22e4d2bd`
+- Run: https://github.com/decorum-guy/memory-site/actions/runs/30885950398
+- Generated: 2026-08-04 07:05:05 UTC
 - Result: **failure**
 
 ## Последние строки ошибки
