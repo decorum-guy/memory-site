@@ -12,7 +12,17 @@
       if (!element) return;
 
       if (block.telegramKind === "note") {
-        element.classList.add("telegram-note", `telegram-note--shape-${Number(block.shape || 0) % 5}`);
+        const shape = Number(block.shape || 0) % 5;
+        const width = block.width === "wide" ? "wide" : "compact";
+        const align = ["left", "right"].includes(block.align) ? block.align : "auto";
+        element.classList.add(
+          "telegram-note",
+          `telegram-note--shape-${shape}`,
+          `telegram-note--${width}`,
+          `telegram-note--align-${align}`
+        );
+        element.style.setProperty("--telegram-offset-x", `${clamp(block.offsetX, -24, 24)}px`);
+        element.style.setProperty("--telegram-offset-y", `${clamp(block.offsetY, -16, 16)}px`);
         return;
       }
 
@@ -84,4 +94,9 @@
       return modal;
     }
   });
+
+  function clamp(value, min, max) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : 0;
+  }
 })();
