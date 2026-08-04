@@ -1,0 +1,35 @@
+name: Temporary video frame render fix
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/temporary_video_frame_render_patch.py"
+      - ".github/workflows/temporary-video-frame-render-fix.yml"
+      - "preview/trigger-video-frame-render-fix.txt"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Apply and validate runtime patch
+        run: |
+          python3 tools/temporary_video_frame_render_patch.py
+          node --check assets/app.js
+      - name: Commit runtime fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/app.js
+          git commit -m "fix: render selected video preview frame before pausing"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
