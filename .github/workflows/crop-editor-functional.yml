@@ -9,12 +9,18 @@ on:
       - "assets/app.js"
       - "assets/media.css"
       - "assets/styles.css"
+      - "assets/production.css"
+      - "assets/preferences.js"
       - "assets/shared-and-telegram.css"
       - "assets/telegram-enhancements.js"
+      - "assets/round4-polish.css"
+      - "assets/round4-polish.js"
       - "assets/cursor-*.css"
       - "assets/cursors/**"
       - "content/telegram.js"
       - "tools/studio.html"
+      - "tools/studio-round4.css"
+      - "tools/studio-round4.js"
       - "tools/telegram_server.py"
       - "tools/telegram_studio.html"
       - "preview/demo_memories.js"
@@ -22,11 +28,13 @@ on:
       - "preview/verify_cursor_states.mjs"
       - "preview/verify_crop_editor.mjs"
       - "preview/verify_round3.mjs"
+      - "preview/verify_round4.mjs"
       - "preview/verify_telegram_studio.mjs"
+      - "preview/verify_telegram_studio_round4.mjs"
       - ".github/workflows/crop-editor-functional.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -36,18 +44,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
-          fetch-depth: 0
-
-      - name: Apply round 4 UX code once
-        run: |
-          python preview/apply_round4_polish.py
-          git restore .github/workflows/crop-editor-functional.yml .github/workflows/apply-round4-polish.yml
-          rm -f preview/apply_round4_polish.py
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "feat: finish round 4 UX polish [skip ci]"
-          git push origin "HEAD:${GITHUB_HEAD_REF}"
 
       - uses: actions/setup-python@v5
         with:
@@ -56,7 +52,7 @@ jobs:
       - name: Validate Telegram builder
         run: |
           python -m pip install --disable-pip-version-check Pillow
-          python -m py_compile tools/telegram_server.py
+          python -m py_compile tools/telegram_server.py tools/import_memories.py
           python - <<'PY'
           import importlib.util
           from pathlib import Path
@@ -64,15 +60,18 @@ jobs:
           module = importlib.util.module_from_spec(spec)
           spec.loader.exec_module(module)
           state = module.normalize_state({
+              "kicker": "Редактируемая фраза",
               "title": "Test",
               "subtitle": "Test",
               "blocks": [
-                  {"type": "note", "text": "Напутствие", "shape": 4},
+                  {"type": "note", "text": "Напутствие", "shape": 4, "layout": "left"},
                   {"type": "quote", "text": "Сообщение Сони", "speaker": "sonya", "screenshot": "media/telegram/test.png"},
                   {"type": "quote", "text": "Сообщение Артёма", "speaker": "me"},
               ],
           })
           modes, chapter = module.build_chapter(state)
+          assert chapter["kicker"] == "Редактируемая фраза"
+          assert chapter["blocks"][0]["layout"] == "left"
           assert [block["telegramKind"] for block in chapter["blocks"]] == ["note", "message", "message"]
           assert chapter["blocks"][1]["speaker"] == "sonya"
           assert chapter["blocks"][2]["speaker"] == "me"
@@ -105,18 +104,28 @@ jobs:
       - name: Validate browser scripts
         run: |
           node --check assets/telegram-enhancements.js
+          node --check assets/round4-polish.js
+          node --check tools/studio-round4.js
           node --check preview/verify_cursor_states.mjs
           node --check preview/verify_round3.mjs
+          node --check preview/verify_round4.mjs
           node --check preview/verify_telegram_studio.mjs
+          node --check preview/verify_telegram_studio_round4.mjs
           python - <<'PY'
           from pathlib import Path
           import re
-          text = Path("tools/telegram_studio.html").read_text(encoding="utf-8")
-          match = re.search(r"<script>\s*([\s\S]*?)\s*</script>", text)
-          assert match, "Telegram Studio inline script not found"
-          Path("/tmp/telegram-studio.js").write_text(match.group(1), encoding="utf-8")
+          for source, target in [
+              ("tools/telegram_studio.html", "/tmp/telegram-studio.js"),
+              ("tools/studio.html", "/tmp/memory-studio.js"),
+          ]:
+              text = Path(source).read_text(encoding="utf-8")
+              matches = re.findall(r"<script(?:\s[^>]*)?>\s*([\s\S]*?)\s*</script>", text)
+              inline = "\n".join(script for script in matches if script.strip())
+              assert inline, f"Inline script not found in {source}"
+              Path(target).write_text(inline, encoding="utf-8")
           PY
           node --check /tmp/telegram-studio.js
+          node --check /tmp/memory-studio.js
 
       - name: Install Chromium
         run: |
@@ -133,6 +142,7 @@ jobs:
           done
           node preview/verify_cursor_states.mjs
           node preview/verify_round3.mjs
+          node preview/verify_round4.mjs
           node preview/verify_crop_editor.mjs
 
       - name: Run Telegram Studio end-to-end verification
@@ -148,11 +158,13 @@ jobs:
             exit 1
           }
           node preview/verify_telegram_studio.mjs
+          rm -f content/telegram-data.json
+          node preview/verify_telegram_studio_round4.mjs
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: round-3-functional-report
+          name: round-4-functional-report
           path: preview/crop-verification-output
           if-no-files-found: warn
           retention-days: 14
