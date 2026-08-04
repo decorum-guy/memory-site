@@ -103,6 +103,8 @@ jobs:
       - name: Capture desktop and mobile screenshots
         id: capture
         continue-on-error: true
+        env:
+          PW_TEST_SCREENSHOT_NO_FONTS_READY: "1"
         run: |
           set -o pipefail
           node preview/capture.mjs 2>&1 | tee preview/capture.log
