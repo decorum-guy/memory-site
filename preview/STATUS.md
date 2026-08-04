@@ -1,8 +1,8 @@
 # Design Preview Status
 
-- Commit: `228b9837f16d7c47c8ca01538fafbb1f9bafa380`
-- Run: https://github.com/decorum-guy/memory-site/actions/runs/30867554832
-- Generated: 2026-08-04 01:06:00 UTC
+- Commit: `fa58b285d06fb4d8e70191b178d8cfd6232cb2e7`
+- Run: https://github.com/decorum-guy/memory-site/actions/runs/30867810751
+- Generated: 2026-08-04 01:10:44 UTC
 - Result: **failure**
 
 ## Последние строки ошибки
@@ -11,7 +11,7 @@ node:internal/modules/run_main:123
     triggerUncaughtException(
     ^
 
-locator.evaluate: Error: Timed out waiting for selected frame 1.2; current=1.2; readyState=0
+locator.evaluate: Error: Timed out waiting for selected frame 1.2; current=0; readyState=4
     at check (eval at evaluate (:291:30), <anonymous>:9:14)
     at /home/runner/work/memory-site/memory-site/preview/capture.mjs:49:28
 
