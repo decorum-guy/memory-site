@@ -22,6 +22,7 @@ on:
       - "preview/verify_cursor_states.mjs"
       - "preview/verify_crop_editor.mjs"
       - "preview/verify_round3.mjs"
+      - "preview/verify_telegram_studio.mjs"
       - "preview/apply_round3_style_patch.py"
       - ".github/workflows/crop-editor-functional.yml"
 
@@ -109,6 +110,7 @@ jobs:
           node --check assets/telegram-enhancements.js
           node --check preview/verify_cursor_states.mjs
           node --check preview/verify_round3.mjs
+          node --check preview/verify_telegram_studio.mjs
           python - <<'PY'
           from pathlib import Path
           import re
@@ -125,7 +127,7 @@ jobs:
           npm install --no-audit --no-fund playwright@1.54.2
           npx playwright install --with-deps chromium
 
-      - name: Run focused functional verification
+      - name: Run reader verification
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/memory-site-server.log 2>&1 &
           for attempt in {1..30}; do
@@ -135,6 +137,20 @@ jobs:
           node preview/verify_cursor_states.mjs
           node preview/verify_round3.mjs
           node preview/verify_crop_editor.mjs
+
+      - name: Run Telegram Studio end-to-end verification
+        run: |
+          rm -f content/telegram-data.json
+          python tools/telegram_server.py >/tmp/telegram-studio-server.log 2>&1 &
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:8765/api/telegram/state >/dev/null && break
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8765/api/telegram/state >/dev/null || {
+            cat /tmp/telegram-studio-server.log
+            exit 1
+          }
+          node preview/verify_telegram_studio.mjs
 
       - uses: actions/upload-artifact@v4
         if: always()
