@@ -35,11 +35,26 @@ try {
   const iconAfter = await censor.locator(".reader-tools__icon").boundingBox();
   assert(iconBefore && iconAfter && Math.abs(iconBefore.width - iconAfter.width) < .5 && Math.abs(iconBefore.height - iconAfter.height) < .5, "Censorship icon geometry changes between states");
 
-  const shortCaption = page.locator('[data-media-key="d01"]').locator("xpath=ancestor::button[1]").locator(".event-preview__caption");
-  const longCaption = page.locator('[data-media-key="d05"]').locator("xpath=ancestor::button[1]").locator(".event-preview__caption");
+  await page.evaluate(() => {
+    const captions = [...document.querySelectorAll(".event-preview__caption")];
+    if (captions.length < 2) throw new Error("Not enough event captions for adaptive-size verification");
+    captions[0].textContent = "Кино";
+    captions[1].textContent = "Очень длинная подпись к фотографии, которая обязательно должна стать компактнее и обрезаться";
+    window.MEMORY_ROUND4.classifyPolaroidCaptions();
+  });
+  const shortCaption = page.locator(".event-preview__caption").nth(0);
+  const longCaption = page.locator(".event-preview__caption").nth(1);
+  assert(await shortCaption.evaluate((node) => node.classList.contains("event-preview__caption--short")), "Short caption was not classified as short");
+  assert(await longCaption.evaluate((node) => node.classList.contains("event-preview__caption--long")), "Long caption was not classified as long");
   const shortSize = parseFloat(await shortCaption.evaluate((node) => getComputedStyle(node).fontSize));
   const longSize = parseFloat(await longCaption.evaluate((node) => getComputedStyle(node).fontSize));
   assert(shortSize > longSize, `Adaptive caption sizes are reversed: ${shortSize} <= ${longSize}`);
+  const longOverflow = await longCaption.evaluate((node) => ({
+    overflow: getComputedStyle(node).overflow,
+    textOverflow: getComputedStyle(node).textOverflow,
+    whiteSpace: getComputedStyle(node).whiteSpace,
+  }));
+  assert(longOverflow.overflow === "hidden" && longOverflow.textOverflow === "ellipsis" && longOverflow.whiteSpace === "nowrap", `Long caption is not safely truncated: ${JSON.stringify(longOverflow)}`);
   const captionBottom = parseFloat(await longCaption.evaluate((node) => getComputedStyle(node).bottom));
   const lineBottom = parseFloat(await longCaption.evaluate((node) => getComputedStyle(node.closest("button"), "::after").bottom));
   assert(captionBottom > lineBottom, `Caption is not above the decorative line: ${captionBottom} <= ${lineBottom}`);
