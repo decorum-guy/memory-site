@@ -55,11 +55,23 @@
       const pages = [...document.querySelectorAll("#memory-book > .memory-page")];
       const links = [...document.querySelectorAll("#chapter-rail a")];
       const rail = document.getElementById("chapter-rail");
+      const openButton = document.getElementById("open-book");
       if (!pages.length || !links.length || !rail) return;
       let frame = 0;
       let applying = false;
+      let lockedIndex = null;
+      let lockUntil = 0;
+
+      const lock = (index, duration = 1100) => {
+        lockedIndex = index;
+        lockUntil = performance.now() + duration;
+        update();
+        window.setTimeout(schedule, duration + 20);
+      };
       const activeIndex = () => {
-        const anchor = window.scrollY + Math.min(window.innerHeight * .34, 360);
+        if (lockedIndex !== null && performance.now() < lockUntil) return lockedIndex;
+        lockedIndex = null;
+        const anchor = window.scrollY + Math.min(window.innerHeight * .12, 120);
         let active = 0;
         pages.forEach((page, index) => { if (page.offsetTop <= anchor) active = index; });
         return active;
@@ -72,16 +84,20 @@
         applying = false;
       };
       const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
+
+      rail.addEventListener("click", (event) => {
+        const link = event.target.closest("a");
+        const index = links.indexOf(link);
+        if (index >= 0) lock(index);
+      }, true);
+      openButton?.addEventListener("click", () => lock(0), true);
       window.addEventListener("scroll", schedule, { passive: true });
       window.addEventListener("resize", schedule);
       window.addEventListener("hashchange", schedule);
       new MutationObserver(() => {
         if (!applying) schedule();
       }).observe(rail, { subtree: true, attributes: true, attributeFilter: ["class"] });
-      links[0].classList.add("is-active");
-      update();
-      window.setTimeout(update, 0);
-      window.setTimeout(update, 180);
+      lock(0, 450);
     }
 
     function captionSize(text) {
