@@ -6,23 +6,19 @@
   <title>Telegram Studio · Memory Site</title>
   <style>
     :root{--paper:#f5ecdd;--ink:#2d2925;--muted:#75695d;--line:#d5c5ad;--accent:#9c3f43;--blue:#4b7692;--danger:#8a3636;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-    *{box-sizing:border-box}body{margin:0;color:var(--ink);background:linear-gradient(120deg,#aa987f,#cdbc9f 50%,#9e896d)}button,input,textarea,select{font:inherit}button{cursor:pointer}
+    *{box-sizing:border-box}body{margin:0;color:var(--ink);background:linear-gradient(120deg,#aa987f,#cdbc9f 50%,#9e896d)}button,input,textarea,select{font:inherit}button{cursor:pointer}[hidden]{display:none!important}
     .top{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;padding:.8rem 1rem;color:#fff;background:rgba(35,31,28,.95);backdrop-filter:blur(12px)}
-    .top h1{margin:0 auto 0 0;font:700 1rem Georgia,serif}.top button,.top a{border:0;padding:.65rem .9rem;color:#2b2723;background:#f7efdf;text-decoration:none;font-weight:800}.top .primary{color:#fff;background:var(--accent)}
-    .status{width:100%;color:#d8cec0;font-size:.76rem}
+    .top h1{margin:0 auto 0 0;font:700 1rem Georgia,serif}.top button,.top a{border:0;padding:.65rem .9rem;color:#2b2723;background:#f7efdf;text-decoration:none;font-weight:800}.top .primary{color:#fff;background:var(--accent)}.status{width:100%;color:#d8cec0;font-size:.76rem}
     main{width:min(1220px,calc(100% - 2rem));margin:1rem auto 5rem;display:grid;gap:1rem}.panel{padding:1.2rem;background:var(--paper);box-shadow:0 1rem 2.5rem rgba(45,32,20,.2)}
-    .intro{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.field{display:grid;gap:.35rem}.field span{font-size:.75rem;font-weight:800}.field input,.field textarea,.field select{width:100%;border:1px solid var(--line);padding:.72rem;background:#fffaf2}.field textarea{min-height:5rem;resize:vertical}
+    .intro{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}.field{display:grid;gap:.35rem}.field span{font-size:.75rem;font-weight:800}.field input,.field textarea,.field select{width:100%;border:1px solid var(--line);padding:.72rem;background:#fffaf2}.field textarea{min-height:5rem;resize:vertical}
     .builder-head{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap}.builder-head h2{margin:0 auto 0 0;font:700 1.3rem Georgia,serif}.builder-head button{border:1px solid var(--line);padding:.65rem .85rem;background:#fffaf2;font-weight:800}.builder-head .add-note{color:#6e4c25}.builder-head .add-quote{color:#fff;background:var(--blue);border-color:var(--blue)}
-    .help{margin:.8rem 0 0;color:var(--muted);font-size:.86rem;line-height:1.55}
-    .blocks{display:grid;gap:1rem}.empty{padding:3rem 1rem;text-align:center;color:var(--muted);border:2px dashed rgba(75,61,45,.25)}
-    .block{position:relative;padding:1rem;border:1px solid var(--line);background:#fff9ef;box-shadow:0 .7rem 1.3rem rgba(42,31,20,.12);cursor:grab}.block.dragging{opacity:.35}.block.drop-before{box-shadow:0 -6px 0 var(--blue),0 .7rem 1.3rem rgba(42,31,20,.12)}
+    .help{margin:.8rem 0 0;color:var(--muted);font-size:.86rem;line-height:1.55}.blocks{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-flow:row dense;gap:1rem;align-items:start}.empty{grid-column:1/-1;padding:3rem 1rem;text-align:center;color:var(--muted);border:2px dashed rgba(75,61,45,.25)}
+    .block{position:relative;grid-column:1/-1;padding:1rem;border:1px solid var(--line);background:#fff9ef;box-shadow:0 .7rem 1.3rem rgba(42,31,20,.12);cursor:grab}.block.note-layout-left{grid-column:1/span 6;transform:translate(-.35rem,.25rem)}.block.note-layout-right{grid-column:7/span 6;transform:translate(.4rem,-.2rem)}.block.dragging{opacity:.35}.block.drop-before{box-shadow:0 -6px 0 var(--blue),0 .7rem 1.3rem rgba(42,31,20,.12)}
     .block-head{display:flex;align-items:center;gap:.55rem;margin-bottom:.8rem}.block-number{display:grid;place-items:center;width:2rem;height:2rem;border-radius:50%;background:#e9dcc7;font-weight:900}.block-kind{font:800 .76rem/1 sans-serif;letter-spacing:.08em;text-transform:uppercase}.block-head .spacer{flex:1}.block-head button{border:0;padding:.45rem .6rem;background:#e7dac7;font-size:.72rem;font-weight:800}.block-head .remove{color:var(--danger);background:#f0d3d3}
-    .note-preview{margin:.4rem 0 1rem;padding:1.15rem 1.35rem;background:#f4e4bd;clip-path:polygon(0 5%,5% 2%,11% 6%,18% 1%,25% 5%,33% 2%,41% 6%,50% 1%,59% 5%,68% 2%,77% 6%,87% 1%,100% 5%,98% 93%,91% 97%,83% 92%,74% 98%,65% 93%,56% 98%,47% 92%,38% 97%,29% 93%,20% 98%,11% 92%,2% 96%);font:400 1.05rem/1.6 Georgia,serif}
-    .quote-grid{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:1rem}.quote-card{padding:1rem;color:#fff;background:var(--blue)}.quote-card.sonya{background:var(--accent)}.quote-card textarea{min-height:9rem;color:inherit;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.35)}.quote-card select{color:#2d2925}
-    .shot{display:grid;gap:.55rem;align-content:start}.shot-preview{min-height:220px;display:grid;place-items:center;overflow:hidden;border:2px dashed #b7a88f;background:#eee3d1}.shot-preview img{width:100%;height:100%;max-height:300px;object-fit:contain}.shot-preview.is-empty{color:var(--muted);text-align:center;padding:1rem}
-    .shot-tools{display:flex;gap:.45rem;flex-wrap:wrap}.shot-tools button{border:1px solid var(--line);padding:.55rem .7rem;background:#fff;font-weight:800}.shot-tools .remove-shot{color:var(--danger)}
-    .hidden-file{display:none}.progress{position:fixed;right:1rem;bottom:1rem;z-index:40;min-width:18rem;padding:.9rem 1rem;color:#fff;background:#2d2925;box-shadow:0 1rem 3rem rgba(0,0,0,.3)}
-    @media(max-width:820px){.intro,.quote-grid{grid-template-columns:1fr}.top{position:relative}.shot-preview{min-height:180px}}
+    .note-preview{width:fit-content;min-width:min(13rem,100%);max-width:100%;margin:.4rem auto 1rem;padding:1.15rem 1.35rem;background:#f4e4bd;font:400 1.05rem/1.6 Georgia,serif;overflow-wrap:anywhere}.note-preview--shape-0{clip-path:polygon(0 5%,5% 2%,11% 6%,18% 1%,25% 5%,33% 2%,41% 6%,50% 1%,59% 5%,68% 2%,77% 6%,87% 1%,100% 5%,98% 93%,91% 97%,83% 92%,74% 98%,65% 93%,56% 98%,47% 92%,38% 97%,29% 93%,20% 98%,11% 92%,2% 96%)}.note-preview--shape-1{clip-path:polygon(0 3%,8% 6%,16% 2%,24% 7%,33% 1%,43% 5%,53% 2%,63% 7%,73% 2%,84% 6%,93% 1%,100% 4%,97% 96%,89% 92%,80% 98%,70% 93%,60% 97%,50% 92%,40% 98%,30% 93%,19% 97%,9% 92%,1% 95%)}.note-preview--shape-2{clip-path:polygon(0 6%,7% 1%,15% 5%,23% 2%,31% 7%,40% 1%,49% 6%,58% 2%,67% 5%,76% 1%,86% 7%,94% 2%,100% 6%,98% 94%,90% 98%,81% 93%,72% 97%,63% 92%,54% 98%,45% 93%,36% 97%,27% 92%,18% 98%,9% 93%,1% 97%)}.note-preview--shape-3{clip-path:polygon(0 4%,6% 7%,14% 1%,22% 5%,30% 2%,38% 6%,47% 1%,56% 5%,65% 2%,74% 7%,83% 1%,92% 5%,100% 2%,97% 95%,88% 98%,79% 92%,70% 97%,61% 93%,52% 98%,43% 92%,34% 97%,25% 93%,16% 98%,7% 92%,1% 96%)}.note-preview--shape-4{clip-path:polygon(0 2%,9% 6%,18% 1%,27% 5%,36% 2%,45% 7%,54% 1%,63% 5%,72% 2%,81% 6%,90% 1%,100% 5%,98% 97%,89% 92%,80% 98%,71% 93%,62% 97%,53% 92%,44% 98%,35% 93%,26% 97%,17% 92%,8% 98%,1% 94%)}
+    .note-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(12rem,.45fr);gap:.8rem;align-items:start}.quote-grid{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:1rem}.quote-card{padding:1rem;color:#fff;background:var(--blue)}.quote-card.sonya{background:var(--accent)}.quote-card textarea{min-height:9rem;color:inherit;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.35)}.quote-card select{color:#2d2925}
+    .shot{display:grid;gap:.55rem;align-content:start}.shot-preview{min-height:220px;display:grid;place-items:center;overflow:hidden;border:2px dashed #b7a88f;background:#eee3d1}.shot-preview img{width:100%;height:100%;max-height:300px;object-fit:contain}.shot-preview.is-empty{color:var(--muted);text-align:center;padding:1rem}.shot-tools{display:flex;gap:.45rem;flex-wrap:wrap}.shot-tools button{border:1px solid var(--line);padding:.55rem .7rem;background:#fff;font-weight:800}.shot-tools .remove-shot{color:var(--danger)}.hidden-file{display:none}.progress{position:fixed;right:1rem;bottom:1rem;z-index:40;min-width:18rem;padding:.9rem 1rem;color:#fff;background:#2d2925;box-shadow:0 1rem 3rem rgba(0,0,0,.3)}
+    @media(max-width:820px){.intro,.quote-grid,.note-fields{grid-template-columns:1fr}.block.note-layout-left,.block.note-layout-right{grid-column:1/-1;transform:none}.top{position:relative}.shot-preview{min-height:180px}}
   </style>
 </head>
 <body>
@@ -33,120 +29,82 @@
     <button class="primary" id="save" type="button">Сохранить главу</button>
     <div class="status" id="status">Подключение к локальному серверу…</div>
   </header>
-
   <main>
     <section class="panel intro">
+      <label class="field"><span>Фраза над заголовком</span><input id="kicker" /></label>
       <label class="field"><span>Название главы</span><input id="title" /></label>
       <label class="field"><span>Подзаголовок</span><textarea id="subtitle"></textarea></label>
     </section>
-
     <section class="panel">
-      <div class="builder-head">
-        <h2>Блоки Telegram-главы</h2>
-        <button class="add-note" id="add-note" type="button">＋ Записка</button>
-        <button class="add-quote" id="add-quote" type="button">＋ Цитата сообщения</button>
-      </div>
-      <p class="help">Записка — твоё напутствие на рваной бумаге. Цитата — текст сообщения от тебя или Сони; скрин сообщения прикладывается только при необходимости. Блоки можно переставлять перетаскиванием.</p>
+      <div class="builder-head"><h2>Блоки Telegram-главы</h2><button class="add-note" id="add-note" type="button">＋ Записка</button><button class="add-quote" id="add-quote" type="button">＋ Цитата сообщения</button></div>
+      <p class="help">Перетаскивай блоки в нужном порядке. Для двух коротких записок на одном уровне поставь первой «слева», второй — «справа»: в книге появятся небольшие случайные смещения, чтобы глава не выглядела построенной по линейке.</p>
     </section>
-
     <section class="blocks" id="blocks"></section>
   </main>
-
   <div class="progress" id="progress" hidden></div>
-
   <script>
     "use strict";
-    let state={title:"",subtitle:"",blocks:[]};
-    let dragged=-1;
-    const $=id=>document.getElementById(id);
-    const blocks=$("blocks"),status=$("status"),progress=$("progress");
-
+    let state={kicker:"",title:"",subtitle:"",blocks:[]},dragged=-1,dirty=false;
+    const $=id=>document.getElementById(id),blocks=$("blocks"),status=$("status"),progress=$("progress");
     load();
 
     async function load(){
       try{
-        const response=await fetch("/api/telegram/state");
-        if(!response.ok)throw new Error("Не удалось прочитать состояние");
-        state=await response.json();
-        if(!Array.isArray(state.blocks))state.blocks=[];
-        $("title").value=state.title||"";
-        $("subtitle").value=state.subtitle||"";
-        render();
-        status.textContent="Готово. Всё работает локально и не загружается в интернет.";
+        const response=await fetch("/api/telegram/state",{cache:"no-store"});if(!response.ok)throw new Error("Не удалось прочитать состояние");
+        state=await response.json();if(!Array.isArray(state.blocks))state.blocks=[];
+        $("kicker").value=state.kicker||"";$("title").value=state.title||"";$("subtitle").value=state.subtitle||"";
+        dirty=false;render();status.textContent="Готово. Всё работает локально и не загружается в интернет.";
       }catch(error){status.textContent=`Ошибка: ${error.message}. Запусти python3 tools/telegram_server.py`;}
     }
-
+    function markDirty(){dirty=true;status.textContent="Есть несохранённые изменения."}
     function uid(prefix){return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`}
-    function addNote(){state.blocks.push({id:uid("note"),type:"note",text:"",shape:Math.floor(Math.random()*5)});render(true)}
-    function addQuote(){state.blocks.push({id:uid("quote"),type:"quote",text:"",speaker:"sonya",screenshot:"",screenshotName:"",screenshotMode:"paper",shape:Math.floor(Math.random()*5)});render(true)}
-
+    function addNote(){state.blocks.push({id:uid("note"),type:"note",text:"",shape:Math.floor(Math.random()*5),layout:"auto"});markDirty();render(true)}
+    function addQuote(){state.blocks.push({id:uid("quote"),type:"quote",text:"",speaker:"sonya",screenshot:"",screenshotName:"",screenshotMode:"paper",shape:Math.floor(Math.random()*5)});markDirty();render(true)}
     function render(scrollToEnd=false){
-      blocks.innerHTML="";
-      state.blocks.forEach((block,index)=>blocks.appendChild(block.type==="quote"?renderQuote(block,index):renderNote(block,index)));
+      blocks.innerHTML="";state.blocks.forEach((block,index)=>blocks.appendChild(block.type==="quote"?renderQuote(block,index):renderNote(block,index)));
       if(!state.blocks.length)blocks.innerHTML='<div class="empty">Добавь первую записку или цитату сообщения.</div>';
       if(scrollToEnd)requestAnimationFrame(()=>blocks.lastElementChild?.scrollIntoView({behavior:"smooth",block:"center"}));
     }
-
-    function shell(block,index,label){
-      const article=document.createElement("article");
-      article.className="block";article.draggable=true;
-      article.innerHTML=`<div class="block-head"><span class="block-number">${index+1}</span><strong class="block-kind">${label}</strong><span class="spacer"></span><button type="button" data-shape>Сменить край</button><button class="remove" type="button" data-remove>Удалить</button></div>`;
-      article.addEventListener("dragstart",()=>{dragged=index;article.classList.add("dragging")});
+    function shell(block,index,label,shapeButton=false){
+      const article=document.createElement("article");article.className="block";article.draggable=true;
+      article.innerHTML=`<div class="block-head"><span class="block-number">${index+1}</span><strong class="block-kind">${label}</strong><span class="spacer"></span>${shapeButton?'<button type="button" data-shape>Сменить край</button>':""}<button class="remove" type="button" data-remove>Удалить</button></div>`;
+      article.addEventListener("dragstart",event=>{if(event.target.closest("input,textarea,select,button")){event.preventDefault();return}dragged=index;article.classList.add("dragging")});
       article.addEventListener("dragend",()=>{dragged=-1;document.querySelectorAll(".drop-before").forEach(x=>x.classList.remove("drop-before"));article.classList.remove("dragging")});
-      article.addEventListener("dragover",event=>{event.preventDefault();article.classList.add("drop-before")});
-      article.addEventListener("dragleave",()=>article.classList.remove("drop-before"));
-      article.addEventListener("drop",event=>{event.preventDefault();article.classList.remove("drop-before");if(dragged<0||dragged===index)return;const [moved]=state.blocks.splice(dragged,1);state.blocks.splice(dragged<index?index-1:index,0,moved);render()});
-      article.querySelector("[data-remove]").addEventListener("click",()=>{state.blocks.splice(index,1);render()});
-      article.querySelector("[data-shape]").addEventListener("click",()=>{block.shape=((Number(block.shape)||0)+1)%5;render()});
+      article.addEventListener("dragover",event=>{event.preventDefault();article.classList.add("drop-before")});article.addEventListener("dragleave",()=>article.classList.remove("drop-before"));
+      article.addEventListener("drop",event=>{event.preventDefault();article.classList.remove("drop-before");if(dragged<0||dragged===index)return;const [moved]=state.blocks.splice(dragged,1);state.blocks.splice(dragged<index?index-1:index,0,moved);markDirty();render()});
+      article.querySelector("[data-remove]").addEventListener("click",()=>{state.blocks.splice(index,1);markDirty();render()});
+      article.querySelector("[data-shape]")?.addEventListener("click",()=>{block.shape=((Number(block.shape)||0)+1)%5;markDirty();render()});
       return article;
     }
-
     function renderNote(block,index){
-      const article=shell(block,index,"Записка");
-      article.insertAdjacentHTML("beforeend", `<div class="note-preview">Напутствие на рваной бумаге · форма ${(Number(block.shape)||0)+1}</div><label class="field"><span>Текст записки</span><textarea placeholder="Напиши здесь то, что хочешь оставить ей…">${esc(block.text||"")}</textarea></label>`);
-      article.querySelector("textarea").addEventListener("input",event=>block.text=event.target.value);
-      return article;
+      block.layout=["left","right"].includes(block.layout)?block.layout:"auto";
+      const article=shell(block,index,"Записка",true);article.classList.add(`note-layout-${block.layout}`);
+      article.insertAdjacentHTML("beforeend",`<div class="note-preview note-preview--shape-${Number(block.shape||0)%5}">${esc(block.text||"Напутствие на рваной бумаге")}</div><div class="note-fields"><label class="field"><span>Текст записки</span><textarea placeholder="Напиши здесь то, что хочешь оставить ей…">${esc(block.text||"")}</textarea></label><label class="field"><span>Расположение</span><select data-layout><option value="auto"${block.layout==="auto"?" selected":""}>Авто · отдельная строка</option><option value="left"${block.layout==="left"?" selected":""}>Слева · половина строки</option><option value="right"${block.layout==="right"?" selected":""}>Справа · половина строки</option></select></label></div>`);
+      const preview=article.querySelector(".note-preview"),textarea=article.querySelector("textarea"),layout=article.querySelector("[data-layout]");
+      textarea.addEventListener("input",event=>{block.text=event.target.value;preview.textContent=block.text||"Напутствие на рваной бумаге";markDirty()});
+      layout.addEventListener("change",event=>{block.layout=event.target.value;markDirty();render()});return article;
     }
-
     function renderQuote(block,index){
       const article=shell(block,index,"Цитата сообщения");
-      article.insertAdjacentHTML("beforeend", `<div class="quote-grid"><div class="quote-card ${block.speaker==="sonya"?"sonya":"me"}"><label class="field"><span>Чья цитата</span><select><option value="sonya"${block.speaker==="sonya"?" selected":""}>Соня — акцентный цвет</option><option value="me"${block.speaker==="me"?" selected":""}>Артём — синий цвет</option></select></label><label class="field"><span>Текст сообщения</span><textarea placeholder="Текст сообщения…">${esc(block.text||"")}</textarea></label></div><div class="shot"><div class="shot-preview ${block.screenshot?"":"is-empty"}">${block.screenshot?`<img src="../${escAttr(block.screenshot)}" alt="" />`:"Скрин сообщения необязателен"}</div><div class="shot-tools"><button type="button" data-upload>${block.screenshot?"Заменить скрин":"Добавить скрин"}</button>${block.screenshot?'<button class="remove-shot" type="button" data-remove-shot>Убрать скрин</button>':""}<input class="hidden-file" type="file" accept="image/png,image/jpeg,image/webp" /></div></div></div>`);
+      article.insertAdjacentHTML("beforeend",`<div class="quote-grid"><div class="quote-card ${block.speaker==="sonya"?"sonya":"me"}"><label class="field"><span>Чья цитата</span><select><option value="sonya"${block.speaker==="sonya"?" selected":""}>Соня — акцентный цвет</option><option value="me"${block.speaker==="me"?" selected":""}>Артём — синий цвет</option></select></label><label class="field"><span>Текст сообщения</span><textarea placeholder="Текст сообщения…">${esc(block.text||"")}</textarea></label></div><div class="shot"><div class="shot-preview ${block.screenshot?"":"is-empty"}">${block.screenshot?`<img src="../${escAttr(block.screenshot)}" alt="" />`:"Скрин сообщения необязателен"}</div><div class="shot-tools"><button type="button" data-upload>${block.screenshot?"Заменить скрин":"Добавить скрин"}</button>${block.screenshot?'<button class="remove-shot" type="button" data-remove-shot>Убрать скрин</button>':""}<input class="hidden-file" type="file" accept="image/png,image/jpeg,image/webp" /></div></div></div>`);
       const select=article.querySelector("select"),textarea=article.querySelector("textarea"),file=article.querySelector("input[type=file]");
-      select.addEventListener("change",event=>{block.speaker=event.target.value;render()});
-      textarea.addEventListener("input",event=>block.text=event.target.value);
-      article.querySelector("[data-upload]").addEventListener("click",()=>file.click());
-      file.addEventListener("change",()=>uploadScreenshot(file.files[0],block));
-      article.querySelector("[data-remove-shot]")?.addEventListener("click",()=>{block.screenshot="";block.screenshotName="";block.screenshotMode="paper";render()});
-      return article;
+      select.addEventListener("change",event=>{block.speaker=event.target.value;markDirty();render()});textarea.addEventListener("input",event=>{block.text=event.target.value;markDirty()});
+      article.querySelector("[data-upload]").addEventListener("click",()=>file.click());file.addEventListener("change",()=>uploadScreenshot(file.files[0],block));
+      article.querySelector("[data-remove-shot]")?.addEventListener("click",()=>{block.screenshot="";block.screenshotName="";block.screenshotMode="paper";markDirty();render()});return article;
     }
-
     async function uploadScreenshot(file,block){
-      if(!file)return;
-      if(!/^image\/(png|jpeg|webp)$/.test(file.type)){alert("Поддерживаются PNG, JPG и WEBP");return}
+      if(!file)return;if(!/^image\/(png|jpeg|webp)$/.test(file.type)){alert("Поддерживаются PNG, JPG и WEBP");return}
       progress.hidden=false;progress.textContent=`Загрузка: ${file.name}`;
-      try{
-        const data=await toDataUrl(file);
-        const response=await fetch("/api/telegram/upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:file.name,data})});
-        const result=await response.json();if(!response.ok)throw new Error(result.error||"Ошибка загрузки");
-        block.screenshot=result.src;block.screenshotName=result.name;block.screenshotMode=result.mode||"paper";render();
-      }catch(error){alert(`${file.name}: ${error.message}`)}
-      finally{progress.hidden=true}
+      try{const data=await toDataUrl(file),response=await fetch("/api/telegram/upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:file.name,data})}),result=await response.json();if(!response.ok)throw new Error(result.error||"Ошибка загрузки");block.screenshot=result.src;block.screenshotName=result.name;block.screenshotMode=result.mode||"paper";markDirty();render()}catch(error){alert(`${file.name}: ${error.message}`)}finally{progress.hidden=true}
     }
-
-    $("add-note").addEventListener("click",addNote);
-    $("add-quote").addEventListener("click",addQuote);
-    $("reload").addEventListener("click",load);
+    ["kicker","title","subtitle"].forEach(id=>$(id).addEventListener("input",markDirty));
+    $("add-note").addEventListener("click",addNote);$("add-quote").addEventListener("click",addQuote);
+    $("reload").addEventListener("click",()=>{if(dirty&&!confirm("Перезагрузить конструктор и потерять все несохранённые изменения?"))return;load()});
     $("save").addEventListener("click",async()=>{
-      state.title=$("title").value;
-      state.subtitle=$("subtitle").value;
-      status.textContent="Сохраняю…";
-      try{
-        const response=await fetch("/api/telegram/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(state)});
-        const result=await response.json();if(!response.ok)throw new Error(result.error||"Ошибка сохранения");
-        status.textContent=`Сохранено: ${result.notes} записок и ${result.quotes} цитат. Открой предпросмотр с telegram=1.`;
-      }catch(error){status.textContent=`Ошибка сохранения: ${error.message}`}
+      state.kicker=$("kicker").value;state.title=$("title").value;state.subtitle=$("subtitle").value;status.textContent="Сохраняю…";
+      try{const response=await fetch("/api/telegram/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(state)}),result=await response.json();if(!response.ok)throw new Error(result.error||"Ошибка сохранения");dirty=false;status.textContent=`Сохранено: ${result.notes} записок и ${result.quotes} цитат. Открой предпросмотр с telegram=1.`}catch(error){status.textContent=`Ошибка сохранения: ${error.message}`}
     });
-
+    window.addEventListener("beforeunload",event=>{if(!dirty)return;event.preventDefault();event.returnValue=""});
     function toDataUrl(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(file)})}
     function esc(value){return String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
     function escAttr(value){return esc(value).replace(/`/g,"&#096;")}

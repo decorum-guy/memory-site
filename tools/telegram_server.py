@@ -33,6 +33,7 @@ MAX_BYTES = 35 * 1024 * 1024
 MAX_REQUEST_BYTES = 75 * 1024 * 1024
 
 DEFAULT_STATE: dict[str, Any] = {
+    "kicker": "Слова, которые остались",
     "title": "То, что осталось в переписке",
     "subtitle": "Несколько наших фраз — и слова, которые я хочу оставить тебе рядом.",
     "blocks": [],
@@ -90,6 +91,7 @@ def normalize_block(value: Any, index: int) -> dict[str, Any] | None:
             "type": "note",
             "text": str(value.get("text") or "").strip(),
             "shape": clamp_shape(value.get("shape"), index),
+            "layout": str(value.get("layout") or "auto") if str(value.get("layout") or "auto") in {"auto", "left", "right"} else "auto",
         }
     if kind == "quote":
         speaker = "sonya" if str(value.get("speaker") or "").lower() == "sonya" else "me"
@@ -146,6 +148,7 @@ def normalize_state(value: Any) -> dict[str, Any]:
     else:
         blocks = migrate_legacy_state(value)
     return {
+        "kicker": str(value.get("kicker") or DEFAULT_STATE["kicker"]).strip(),
         "title": str(value.get("title") or DEFAULT_STATE["title"]).strip(),
         "subtitle": str(value.get("subtitle") or DEFAULT_STATE["subtitle"]).strip(),
         "blocks": blocks,
@@ -179,6 +182,7 @@ def build_chapter(state: dict[str, Any]) -> tuple[dict[str, str], dict[str, Any]
                 "style": "torn",
                 "shape": shape,
                 "rotate": rotate,
+                "layout": item.get("layout") if item.get("layout") in {"left", "right"} else "auto",
             })
             continue
 
@@ -205,7 +209,7 @@ def build_chapter(state: dict[str, Any]) -> tuple[dict[str, str], dict[str, Any]
     chapter = {
         "id": "telegram",
         "number": "TG",
-        "kicker": "Слова, которые остались",
+        "kicker": state.get("kicker") or DEFAULT_STATE["kicker"],
         "title": state.get("title") or DEFAULT_STATE["title"],
         "subtitle": state.get("subtitle") or DEFAULT_STATE["subtitle"],
         "layout": "wide",

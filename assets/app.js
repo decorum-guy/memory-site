@@ -36,6 +36,10 @@
   bindNavigation();
   observeChapters();
   restoreReaderChrome();
+  document.addEventListener("memory:censorship-change", (event) => {
+    if (!event.detail?.off) revealedCensored.clear();
+    if (!lightbox.hidden) updateLightbox();
+  });
 
   function byId(id) { return document.getElementById(id); }
 
@@ -290,10 +294,11 @@
     const frame = document.createElement("span");
     const key = mediaKey(item);
     const locallyRevealed = revealedCensored.has(key);
-    const isCensored = item.censored && !locallyRevealed;
+    const isCensored = item.censored && !window.MEMORY_CENSORSHIP_OFF && !locallyRevealed;
     const crop = normalizeCrop(item.crop);
     frame.className = `image-frame media-kind-${safeClass(item.kind)}`;
     frame.dataset.mediaKey = key;
+    frame.dataset.censored = item.censored ? "1" : "0";
     frame.classList.toggle("is-censored", isCensored);
     frame.classList.toggle("is-revealed", locallyRevealed);
 
@@ -528,7 +533,7 @@
     lightbox.classList.toggle("is-video", item.kind === "video");
     lightbox.classList.toggle("is-live", item.kind === "live");
 
-    if (item.censored && !revealedCensored.has(mediaKey(item))) {
+    if (!window.MEMORY_CENSORSHIP_OFF && item.censored && !revealedCensored.has(mediaKey(item))) {
       lockCensoredItem();
       return;
     }
@@ -610,7 +615,7 @@
 
   function isCurrentCensoredLocked() {
     const item = activeGallery[activeIndex];
-    return Boolean(item && item.censored && !revealedCensored.has(mediaKey(item)));
+    return Boolean(item && !window.MEMORY_CENSORSHIP_OFF && item.censored && !revealedCensored.has(mediaKey(item)));
   }
 
   function mediaKey(item, fallbackIndex = activeIndex) {

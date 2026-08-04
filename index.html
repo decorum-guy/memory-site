@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="assets/shared-and-telegram.css" />
   <link rel="stylesheet" href="assets/round4.css" />
   <link rel="stylesheet" href="assets/cursor-scrapbook-pencil-final-v19.css" />
+  <link rel="stylesheet" href="assets/round4-polish.css" />
 </head>
 <body>
   <div class="ambient-grain" aria-hidden="true"></div>
@@ -27,7 +28,7 @@
       <div class="cover__seal" aria-hidden="true"><span>♥</span></div>
       <p class="cover__note" id="cover-note">Собрано вручную — из фотографий, видео и маленьких моментов.</p>
       <button class="open-book" id="open-book" type="button">
-        <span>Открыть книгу</span>
+        <span id="cover-open-label">Открыть книгу</span>
         <span class="open-book__arrow" aria-hidden="true">↘</span>
       </button>
     </div>
@@ -47,7 +48,10 @@
     <figure class="lightbox__figure">
       <img class="lightbox__image" id="lightbox-image" alt="" />
       <video class="lightbox__video" id="lightbox-video" playsinline preload="metadata" hidden></video>
-      <button class="lightbox__live" id="lightbox-live" type="button" hidden>▶ Оживить фото</button>
+      <div class="lightbox__live-controls">
+        <button class="lightbox__live" id="lightbox-live" type="button" hidden>▶ Оживить фото</button>
+        <button class="lightbox__sound" id="lightbox-live-sound" type="button" hidden aria-pressed="false" aria-label="Выключить звук" title="Выключить звук">🔊</button>
+      </div>
       <div class="lightbox__censor" id="lightbox-censor" hidden>
         <div class="lightbox__censor-card">
           <button class="lightbox__censor-close" id="lightbox-censor-close" type="button" aria-label="Закрыть предупреждение">×</button>
@@ -73,6 +77,7 @@
   <script src="assets/preferences.js"></script>
   <script src="assets/app.js"></script>
   <script src="assets/telegram-enhancements.js"></script>
+  <script src="assets/round4-polish.js"></script>
   <script src="assets/round4.js"></script>
 </body>
 </html>

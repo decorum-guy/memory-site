@@ -10,7 +10,6 @@
   if (telegramEnabled && window.TELEGRAM_CHAPTER && !book.chapters.some((chapter) => chapter.id === "telegram")) {
     book.chapters.push(JSON.parse(JSON.stringify(window.TELEGRAM_CHAPTER)));
   }
-
   book.chapters = book.chapters.filter((chapter) => chapter.enabled !== false);
 
   const storageKey = "memory-censorship-disabled";
@@ -18,11 +17,9 @@
   const sessionCensorshipOff = safeSessionGet(storageKey) === "1";
   const defaultOff = settings.censorshipEnabledByDefault === false;
   let censorshipOff = queryCensorshipOff || sessionCensorshipOff || defaultOff;
-  const censoredItems = collectCensored(book);
-  const censoredCount = censoredItems.length;
-
-  window.MEMORY_CENSORED_ITEMS = censoredItems;
-  applyCensorshipState(censorshipOff, false);
+  const censoredCount = countCensored(book);
+  window.MEMORY_CENSORSHIP_OFF = censorshipOff;
+  document.documentElement.classList.toggle("censorship-off", censorshipOff);
 
   document.addEventListener("DOMContentLoaded", function () {
     renderSharedAlbum();
@@ -35,49 +32,48 @@
     const censorButton = document.createElement("button");
     censorButton.type = "button";
     censorButton.className = "reader-tools__button reader-tools__button--censor";
-    updateCensorButton(censorButton);
+    updateCensorButton();
     censorButton.addEventListener("click", function () {
+      const scrollX = window.scrollX;
+      const scrollY = window.scrollY;
       censorshipOff = !censorshipOff;
-      if (censorshipOff) safeSessionSet(storageKey, "1");
-      else safeSessionRemove(storageKey);
+      window.MEMORY_CENSORSHIP_OFF = censorshipOff;
+      document.documentElement.classList.toggle("censorship-off", censorshipOff);
 
       const nextUrl = new URL(window.location.href);
-      if (censorshipOff) nextUrl.searchParams.set("censor", "off");
-      else nextUrl.searchParams.delete("censor");
-      try { window.history.replaceState(null, "", nextUrl.toString()); }
-      catch (_) { /* file:// and older browsers still keep the in-memory state */ }
+      if (censorshipOff) {
+        safeSessionSet(storageKey, "1");
+        nextUrl.searchParams.set("censor", "off");
+      } else {
+        safeSessionRemove(storageKey);
+        nextUrl.searchParams.delete("censor");
+      }
+      try { history.replaceState(history.state, "", nextUrl); }
+      catch (_) { /* file:// keeps working even when history is restricted */ }
 
-      applyCensorshipState(censorshipOff, true);
-      updateCensorButton(censorButton);
+      updateCensorButton();
+      document.dispatchEvent(new CustomEvent("memory:censorship-change", { detail: { off: censorshipOff } }));
+      requestAnimationFrame(() => window.scrollTo(scrollX, scrollY));
     });
 
     const topButton = document.createElement("button");
     topButton.type = "button";
     topButton.className = "reader-tools__button reader-tools__button--top";
-    topButton.innerHTML = "<span aria-hidden=\"true\">↑</span><strong>К обложке</strong>";
+    topButton.innerHTML = '<span class="reader-tools__top-icon" aria-hidden="true">↑</span><strong>К обложке</strong>';
     topButton.addEventListener("click", function () {
       document.getElementById("cover")?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth" });
     });
 
     controls.append(censorButton, topButton);
     document.body.appendChild(controls);
-  });
 
-  function updateCensorButton(button) {
-    button.setAttribute("aria-pressed", censorshipOff ? "true" : "false");
-    button.innerHTML = censorshipOff
-      ? '<span class="reader-tools__icon" aria-hidden="true"></span><strong>Вернуть цензуру</strong>'
-      : `<span class="reader-tools__icon" aria-hidden="true"></span><strong>Показать всё скрытое${censoredCount ? ` · ${censoredCount}` : ""}</strong>`;
-  }
-
-  function applyCensorshipState(off, notify) {
-    censoredItems.forEach((item) => { item.censored = !off; });
-    window.MEMORY_CENSORSHIP_OFF = off;
-    document.documentElement.classList.toggle("censorship-off", off);
-    if (notify) {
-      document.dispatchEvent(new CustomEvent("memory:censorship-change", { detail: { off } }));
+    function updateCensorButton() {
+      censorButton.setAttribute("aria-pressed", censorshipOff ? "true" : "false");
+      censorButton.innerHTML = censorshipOff
+        ? '<span class="reader-tools__icon" aria-hidden="true"><i></i></span><strong>Вернуть цензуру</strong>'
+        : `<span class="reader-tools__icon" aria-hidden="true"><i></i></span><strong>Показать всё скрытое${censoredCount ? ` · ${censoredCount}` : ""}</strong>`;
     }
-  }
+  });
 
   function renderSharedAlbum() {
     const previewMode = params.get("shared") === "1";
@@ -87,10 +83,7 @@
 
     const mount = document.getElementById("shared-album");
     if (!mount) return;
-
-    const qr = previewMode
-      ? "preview/demo-media/shared-album-qr.png"
-      : String(settings.sharedAlbumQr || "media/shared-album-qr.png");
+    const qr = previewMode ? "preview/demo-media/shared-album-qr.png" : String(settings.sharedAlbumQr || "media/shared-album-qr.png");
     const title = settings.sharedAlbumTitle || "Все фотографии и видео — ещё и в Shared Album";
     const text = settings.sharedAlbumText || "Открой альбом на телефоне или компьютере.";
 
@@ -121,56 +114,27 @@
   }
 
   async function copyText(value) {
-    try {
-      await navigator.clipboard.writeText(value);
-      return true;
-    } catch (_) {
-      return false;
-    }
+    try { await navigator.clipboard.writeText(value); return true; }
+    catch (_) { return false; }
   }
 
-  function collectCensored(value) {
-    const items = [];
-    walkMedia(value, function (item) {
-      if (item.censored === true) items.push(item);
-    });
-    return items;
+  function countCensored(value) {
+    let count = 0;
+    walkMedia(value, (item) => { if (item.censored === true) count += 1; });
+    return count;
   }
 
   function walkMedia(value, visitor) {
     if (!value || typeof value !== "object") return;
-    if (Array.isArray(value)) {
-      value.forEach((item) => walkMedia(item, visitor));
-      return;
-    }
+    if (Array.isArray(value)) { value.forEach((item) => walkMedia(item, visitor)); return; }
     if (value.kind || value.type === "photo" || value.type === "video") visitor(value);
     Object.values(value).forEach((child) => walkMedia(child, visitor));
   }
 
-  function safeSessionGet(key) {
-    try { return window.sessionStorage.getItem(key); }
-    catch (_) { return null; }
-  }
-
-  function safeSessionSet(key, value) {
-    try { window.sessionStorage.setItem(key, value); }
-    catch (_) { /* query parameter remains the fallback */ }
-  }
-
-  function safeSessionRemove(key) {
-    try { window.sessionStorage.removeItem(key); }
-    catch (_) { /* no-op */ }
-  }
-
-  function prefersReducedMotion() {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }
-
-  function escapeHtml(value) {
-    return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;");
-  }
-
-  function escapeAttr(value) {
-    return escapeHtml(value).replace(/`/g, "&#096;");
-  }
+  function safeSessionGet(key) { try { return window.sessionStorage.getItem(key); } catch (_) { return null; } }
+  function safeSessionSet(key, value) { try { window.sessionStorage.setItem(key, value); } catch (_) {} }
+  function safeSessionRemove(key) { try { window.sessionStorage.removeItem(key); } catch (_) {} }
+  function prefersReducedMotion() { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; }
+  function escapeHtml(value) { return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+  function escapeAttr(value) { return escapeHtml(value).replace(/`/g, "&#096;"); }
 })();
