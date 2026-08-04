@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Local drag-and-drop studio for importing Telegram screenshots.
+"""Local Telegram chapter constructor for Memory Site.
 
-Run from the repository root:
+Run from repository root:
     python3 tools/telegram_server.py
 
-The server listens only on 127.0.0.1, copies dropped images into media/telegram,
-and writes content/telegram.js. Nothing is uploaded to the internet.
+The server listens only on 127.0.0.1. Optional screenshots are copied to
+media/telegram and the generated chapter is written to content/telegram.js.
+Nothing is uploaded to the internet.
 """
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ import base64
 import json
 import re
 import threading
+import uuid
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -28,14 +30,17 @@ HOST = "127.0.0.1"
 PORT = 8765
 ALLOWED = {".png", ".jpg", ".jpeg", ".webp"}
 MAX_BYTES = 35 * 1024 * 1024
+MAX_REQUEST_BYTES = 75 * 1024 * 1024
 
 DEFAULT_STATE: dict[str, Any] = {
     "title": "То, что осталось в переписке",
-    "subtitle": "Не полный архив чата — только фрагменты, которые сами стали воспоминаниями.",
-    "intro": "Здесь собраны отдельные кусочки нашей переписки. Не по важности — просто те, которые захотелось оставить.",
-    "quote": "",
-    "items": [],
+    "subtitle": "Несколько наших фраз — и слова, которые я хочу оставить тебе рядом.",
+    "blocks": [],
 }
+
+
+def new_id(prefix: str) -> str:
+    return f"{prefix}-{uuid.uuid4().hex[:10]}"
 
 
 def safe_name(value: str) -> str:
@@ -48,10 +53,11 @@ def safe_name(value: str) -> str:
 
 
 def unique_path(name: str) -> Path:
-    candidate = MEDIA_DIR / safe_name(name)
+    cleaned = safe_name(name)
+    candidate = MEDIA_DIR / cleaned
     index = 2
     while candidate.exists():
-        candidate = MEDIA_DIR / f"{Path(safe_name(name)).stem}-{index}{candidate.suffix}"
+        candidate = MEDIA_DIR / f"{Path(cleaned).stem}-{index}{Path(cleaned).suffix}"
         index += 1
     return candidate
 
@@ -62,57 +68,144 @@ def image_has_transparency(path: Path) -> bool:
             if image.mode in {"RGBA", "LA"}:
                 alpha = image.getchannel("A")
                 return alpha.getextrema()[0] < 255
-            if image.mode == "P" and "transparency" in image.info:
-                return True
+            return image.mode == "P" and "transparency" in image.info
     except Exception:
         return False
-    return False
+
+
+def clamp_shape(value: Any, fallback: int = 0) -> int:
+    try:
+        return int(value) % 5
+    except (TypeError, ValueError):
+        return fallback % 5
+
+
+def normalize_block(value: Any, index: int) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    kind = str(value.get("type") or "").strip().lower()
+    if kind == "note":
+        return {
+            "id": str(value.get("id") or new_id("note")),
+            "type": "note",
+            "text": str(value.get("text") or "").strip(),
+            "shape": clamp_shape(value.get("shape"), index),
+        }
+    if kind == "quote":
+        speaker = "sonya" if str(value.get("speaker") or "").lower() == "sonya" else "me"
+        screenshot = str(value.get("screenshot") or "").strip()
+        if screenshot and (Path(screenshot).is_absolute() or ".." in Path(screenshot).parts):
+            screenshot = ""
+        return {
+            "id": str(value.get("id") or new_id("quote")),
+            "type": "quote",
+            "text": str(value.get("text") or "").strip(),
+            "speaker": speaker,
+            "screenshot": screenshot,
+            "screenshotName": str(value.get("screenshotName") or (Path(screenshot).name if screenshot else "")),
+            "screenshotMode": "cutout" if value.get("screenshotMode") == "cutout" else "paper",
+            "shape": clamp_shape(value.get("shape"), index),
+        }
+    return None
+
+
+def migrate_legacy_state(value: dict[str, Any]) -> list[dict[str, Any]]:
+    blocks: list[dict[str, Any]] = []
+    intro = str(value.get("intro") or "").strip()
+    if intro:
+        blocks.append({"id": new_id("note"), "type": "note", "text": intro, "shape": 0})
+    for index, item in enumerate(value.get("items") or []):
+        if not isinstance(item, dict):
+            continue
+        blocks.append({
+            "id": new_id("quote"),
+            "type": "quote",
+            "text": str(item.get("caption") or "Фрагмент нашей переписки").strip(),
+            "speaker": "sonya",
+            "screenshot": str(item.get("src") or ""),
+            "screenshotName": str(item.get("name") or Path(str(item.get("src") or "")).name),
+            "screenshotMode": "cutout" if item.get("mode") == "cutout" else "paper",
+            "shape": index % 5,
+        })
+    ending = str(value.get("quote") or "").strip()
+    if ending:
+        blocks.append({"id": new_id("note"), "type": "note", "text": ending, "shape": 3})
+    return blocks
+
+
+def normalize_state(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        value = {}
+    raw_blocks = value.get("blocks")
+    if isinstance(raw_blocks, list):
+        blocks = [
+            block
+            for index, raw in enumerate(raw_blocks)
+            if (block := normalize_block(raw, index)) is not None
+        ]
+    else:
+        blocks = migrate_legacy_state(value)
+    return {
+        "title": str(value.get("title") or DEFAULT_STATE["title"]).strip(),
+        "subtitle": str(value.get("subtitle") or DEFAULT_STATE["subtitle"]).strip(),
+        "blocks": blocks,
+    }
 
 
 def load_state() -> dict[str, Any]:
     if not DATA_FILE.exists():
         return json.loads(json.dumps(DEFAULT_STATE, ensure_ascii=False))
     try:
-        value = json.loads(DATA_FILE.read_text(encoding="utf-8"))
-        merged = {**DEFAULT_STATE, **value}
-        merged["items"] = value.get("items", [])
-        return merged
+        return normalize_state(json.loads(DATA_FILE.read_text(encoding="utf-8")))
     except Exception:
         return json.loads(json.dumps(DEFAULT_STATE, ensure_ascii=False))
 
 
 def build_chapter(state: dict[str, Any]) -> tuple[dict[str, str], dict[str, Any]]:
-    items = state.get("items", [])
-    modes = {item["src"]: item.get("mode", "paper") for item in items}
     blocks: list[dict[str, Any]] = []
-    intro = str(state.get("intro", "")).strip()
-    if intro:
-        blocks.append({"type": "note", "text": intro, "style": "torn", "rotate": -1.2})
+    modes: dict[str, str] = {}
 
-    for index in range(0, len(items), 7):
-        chunk = items[index:index + 7]
+    for index, item in enumerate(state.get("blocks", [])):
+        shape = clamp_shape(item.get("shape"), index)
+        rotate = (-1.2, .75, -0.45, 1.05, -0.8)[shape]
+        if item.get("type") == "note":
+            text = str(item.get("text") or "").strip()
+            if not text:
+                continue
+            blocks.append({
+                "type": "note",
+                "telegramKind": "note",
+                "text": text,
+                "style": "torn",
+                "shape": shape,
+                "rotate": rotate,
+            })
+            continue
+
+        text = str(item.get("text") or "").strip()
+        screenshot = str(item.get("screenshot") or "").strip()
+        if not text and not screenshot:
+            continue
+        speaker = "sonya" if item.get("speaker") == "sonya" else "me"
+        if screenshot:
+            modes[screenshot] = "cutout" if item.get("screenshotMode") == "cutout" else "paper"
         blocks.append({
-            "type": "collage",
-            "title": "Фрагменты переписки" if index == 0 else f"Ещё несколько фрагментов · {index // 7 + 1}",
-            "caption": "Нажми на любой фрагмент, чтобы рассмотреть его ближе.",
-            "photos": [
-                {
-                    "src": item["src"],
-                    "alt": item.get("alt") or "Фрагмент переписки из Telegram",
-                    "caption": item.get("caption", ""),
-                }
-                for item in chunk
-            ],
+            "type": "quote",
+            "telegramKind": "message",
+            "text": text or "Сообщение без подписи",
+            "author": "Соня" if speaker == "sonya" else "Артём",
+            "speaker": speaker,
+            "screenshot": screenshot,
+            "screenshotAlt": f"Скриншот сообщения — {'Соня' if speaker == 'sonya' else 'Артём'}",
+            "screenshotMode": modes.get(screenshot, "paper"),
+            "shape": shape,
+            "rotate": rotate,
         })
-
-    quote = str(state.get("quote", "")).strip()
-    if quote:
-        blocks.append({"type": "quote", "text": quote, "author": "из Telegram", "rotate": 1.1})
 
     chapter = {
         "id": "telegram",
         "number": "TG",
-        "kicker": "Несколько сообщений",
+        "kicker": "Слова, которые остались",
         "title": state.get("title") or DEFAULT_STATE["title"],
         "subtitle": state.get("subtitle") or DEFAULT_STATE["subtitle"],
         "layout": "wide",
@@ -122,7 +215,8 @@ def build_chapter(state: dict[str, Any]) -> tuple[dict[str, str], dict[str, Any]
     return modes, chapter
 
 
-def write_state(state: dict[str, Any]) -> None:
+def write_state(value: Any) -> dict[str, Any]:
+    state = normalize_state(value)
     DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
     DATA_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     modes, chapter = build_chapter(state)
@@ -133,6 +227,7 @@ def write_state(state: dict[str, Any]) -> None:
         f"window.TELEGRAM_CHAPTER = {json.dumps(chapter, ensure_ascii=False, indent=2)};\n"
     )
     JS_FILE.write_text(content, encoding="utf-8")
+    return state
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -152,8 +247,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def read_json(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
-        if length > MAX_BYTES * 2:
-            raise ValueError("Слишком большой запрос")
+        if length <= 0 or length > MAX_REQUEST_BYTES:
+            raise ValueError("Некорректный или слишком большой запрос")
         return json.loads(self.rfile.read(length).decode("utf-8"))
 
     def do_GET(self) -> None:
@@ -168,9 +263,10 @@ class Handler(SimpleHTTPRequestHandler):
                 self.handle_upload()
                 return
             if self.path == "/api/telegram/save":
-                state = self.read_json()
-                write_state(state)
-                self.send_json({"ok": True, "items": len(state.get("items", []))})
+                state = write_state(self.read_json())
+                notes = sum(1 for block in state["blocks"] if block["type"] == "note")
+                quotes = sum(1 for block in state["blocks"] if block["type"] == "quote")
+                self.send_json({"ok": True, "blocks": len(state["blocks"]), "notes": notes, "quotes": quotes})
                 return
             self.send_json({"error": "Неизвестный endpoint"}, 404)
         except Exception as exc:
@@ -178,35 +274,39 @@ class Handler(SimpleHTTPRequestHandler):
 
     def handle_upload(self) -> None:
         value = self.read_json()
-        name = str(value.get("name", "telegram.png"))
+        name = str(value.get("name") or "telegram.png")
         suffix = Path(name).suffix.lower()
         if suffix not in ALLOWED:
             raise ValueError("Поддерживаются PNG, JPG, JPEG и WEBP")
-        raw = str(value.get("data", ""))
+        raw = str(value.get("data") or "")
         if "," in raw:
             raw = raw.split(",", 1)[1]
         content = base64.b64decode(raw, validate=True)
-        if len(content) > MAX_BYTES:
-            raise ValueError("Один файл не должен превышать 35 МБ")
+        if not content or len(content) > MAX_BYTES:
+            raise ValueError("Файл пустой или превышает 35 МБ")
 
         MEDIA_DIR.mkdir(parents=True, exist_ok=True)
         target = unique_path(name)
         target.write_bytes(content)
-        mode = "cutout" if image_has_transparency(target) else "paper"
+        try:
+            with Image.open(target) as image:
+                image.verify()
+        except Exception:
+            target.unlink(missing_ok=True)
+            raise ValueError("Файл не является читаемым изображением")
+
         relative = target.relative_to(ROOT).as_posix()
         self.send_json({
             "src": relative,
-            "caption": "",
-            "alt": "Фрагмент переписки из Telegram",
-            "mode": mode,
             "name": target.name,
+            "mode": "cutout" if image_has_transparency(target) else "paper",
         })
 
 
 def main() -> int:
     MEDIA_DIR.mkdir(parents=True, exist_ok=True)
     if not DATA_FILE.exists():
-        write_state(load_state())
+        write_state(DEFAULT_STATE)
     url = f"http://{HOST}:{PORT}/tools/telegram_studio.html"
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"Telegram Studio: {url}")
