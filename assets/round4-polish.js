@@ -164,14 +164,12 @@
           if (!video.hidden && (video.currentSrc || video.getAttribute("src"))) {
             video.muted = false;
             video.volume = 1;
-            video.play().catch(() => { video.muted = true; renderSound(); });
           }
           renderSound();
         });
       });
       soundButton.addEventListener("click", () => {
         video.muted = !video.muted;
-        if (!video.muted) video.play().catch(() => { video.muted = true; });
         renderSound();
       });
       new MutationObserver(renderSound).observe(video, { attributes: true, attributeFilter: ["hidden", "src"] });
