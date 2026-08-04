@@ -13,7 +13,12 @@ const browser = await chromium.launch({ headless: true, args: ["--autoplay-polic
 async function settle(page) {
   await page.waitForLoadState("networkidle");
   await page.evaluate(async () => {
-    if (document.fonts?.ready) await document.fonts.ready;
+    if (document.fonts?.ready) {
+      await Promise.race([
+        document.fonts.ready,
+        new Promise((resolve) => window.setTimeout(resolve, 3000)),
+      ]);
+    }
     const images = [...document.images];
     images.forEach((image) => { image.loading = "eager"; });
     await Promise.all(images.map((image) => image.complete
