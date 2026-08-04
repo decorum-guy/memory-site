@@ -1,0 +1,1 @@
+Trigger a clean Chromium verification of the crop and video-frame editor.
