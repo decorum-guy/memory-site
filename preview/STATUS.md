@@ -1,18 +1,19 @@
 # Design Preview Status
 
-- Commit: `5616affe05090e89dc0940a7431433276d3cf167`
-- Run: https://github.com/decorum-guy/memory-site/actions/runs/30867202371
-- Generated: 2026-08-04 00:59:29 UTC
+- Commit: `228b9837f16d7c47c8ca01538fafbb1f9bafa380`
+- Run: https://github.com/decorum-guy/memory-site/actions/runs/30867554832
+- Generated: 2026-08-04 01:06:00 UTC
 - Result: **failure**
 
 ## Последние строки ошибки
 ```text
-file:///home/runner/work/memory-site/memory-site/preview/capture.mjs:61
-  throw new Error(`Selected video frame was not sought: ${selectedVideoState.currentTime}`);
-        ^
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
 
-Error: Selected video frame was not sought: 0
-    at file:///home/runner/work/memory-site/memory-site/preview/capture.mjs:61:9
+locator.evaluate: Error: Timed out waiting for selected frame 1.2; current=1.2; readyState=0
+    at check (eval at evaluate (:291:30), <anonymous>:9:14)
+    at /home/runner/work/memory-site/memory-site/preview/capture.mjs:49:28
 
 Node.js v20.20.2
 ```
