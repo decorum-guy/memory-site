@@ -26,7 +26,7 @@ on:
       - ".github/workflows/crop-editor-functional.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -36,6 +36,27 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Apply round 4 UX patch once
+        run: |
+          python preview/apply_round4_polish.py
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/crop-editor-functional.yml')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('permissions:\n  contents: write', 'permissions:\n  contents: read', 1)
+          start = text.index('      - name: Apply round 4 UX patch once\n')
+          end = text.index('      - uses: actions/setup-python@v5\n', start)
+          text = text[:start] + text[end:]
+          path.write_text(text, encoding='utf-8')
+          PY
+          rm -f preview/apply_round4_polish.py .github/workflows/apply-round4-polish.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: finish round 4 UX polish [skip ci]"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
 
       - uses: actions/setup-python@v5
         with:
