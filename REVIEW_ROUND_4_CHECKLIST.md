@@ -4,11 +4,13 @@
 
 ## Telegram Studio
 
-Запусти из корня тестовой копии:
+Запусти из корня текущего репозитория:
 
 ```bash
-python3 ".memory-test/site/tools/telegram_server.py"
+python3 tools/telegram_server.py
 ```
+
+Не запускай копию из `.memory-test/site`: это изолированная тестовая директория, которая может содержать устаревшую версию интерфейса.
 
 Проверь:
 
