@@ -77,8 +77,8 @@
     }
 
     function uid(prefix){return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`}
-    function addNote(){state.blocks.push({id:uid("note"),type:"note",text:"",shape:state.blocks.length%5});render(true)}
-    function addQuote(){state.blocks.push({id:uid("quote"),type:"quote",text:"",speaker:"sonya",screenshot:"",screenshotName:"",screenshotMode:"paper",shape:state.blocks.length%5});render(true)}
+    function addNote(){state.blocks.push({id:uid("note"),type:"note",text:"",shape:Math.floor(Math.random()*5)});render(true)}
+    function addQuote(){state.blocks.push({id:uid("quote"),type:"quote",text:"",speaker:"sonya",screenshot:"",screenshotName:"",screenshotMode:"paper",shape:Math.floor(Math.random()*5)});render(true)}
 
     function render(scrollToEnd=false){
       blocks.innerHTML="";
