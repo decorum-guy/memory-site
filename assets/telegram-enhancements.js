@@ -1,6 +1,16 @@
 (function () {
   "use strict";
 
+  if (typeof BroadcastChannel === "function") {
+    const previewChannel = new BroadcastChannel("memory-telegram-preview");
+    previewChannel.addEventListener("message", (event) => {
+      if (event.data?.type !== "telegram-saved") return;
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("telegram") !== "1") return;
+      window.location.reload();
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     const chapter = window.TELEGRAM_CHAPTER;
     const root = document.getElementById("telegram");
