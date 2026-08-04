@@ -6,8 +6,7 @@ on:
     paths:
       - "preview/trigger-crop-editor-apply.txt"
       - ".github/workflows/temporary-crop-editor-apply.yml"
-      - "tools/.crop-editor-studio.b64"
-      - "tools/.crop-editor-rest.b64"
+      - "tools/.crop-editor-payload.part*"
 
 permissions:
   contents: write
@@ -35,25 +34,26 @@ jobs:
           from pathlib import Path, PurePosixPath
 
           root = Path.cwd()
-          studio_payload = root / "tools/.crop-editor-studio.b64"
-          rest_payload = root / "tools/.crop-editor-rest.b64"
-
-          studio = gzip.decompress(base64.b64decode(studio_payload.read_text(encoding="utf-8")))
-          (root / "tools/studio.html").write_bytes(studio)
+          parts = sorted((root / "tools").glob(".crop-editor-payload.part*"))
+          if len(parts) != 4:
+              raise SystemExit(f"Expected 4 payload parts, found {len(parts)}")
+          encoded = "".join(path.read_text(encoding="utf-8").strip() for path in parts)
+          archive = gzip.decompress(base64.b64decode(encoded, validate=True))
 
           expected = {
+              "tools/studio.html",
               "assets/app.js",
               "assets/media.css",
               "preview/demo_memories.js",
               "preview/capture.mjs",
               "REVIEW_ROUND_2_CHECKLIST.md",
           }
-          archive = gzip.decompress(base64.b64decode(rest_payload.read_text(encoding="utf-8")))
           with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as tar:
-              names = {member.name for member in tar.getmembers() if member.isfile()}
+              members = tar.getmembers()
+              names = {member.name for member in members if member.isfile()}
               if names != expected:
                   raise SystemExit(f"Unexpected payload members: {sorted(names)}")
-              for member in tar.getmembers():
+              for member in members:
                   path = PurePosixPath(member.name)
                   if path.is_absolute() or ".." in path.parts:
                       raise SystemExit(f"Unsafe archive path: {member.name}")
@@ -79,7 +79,7 @@ jobs:
 
       - name: Commit implementation
         run: |
-          rm -f tools/.crop-editor-studio.b64 tools/.crop-editor-rest.b64
+          rm -f tools/.crop-editor-payload.part* tools/.crop-editor-studio.b64 tools/.crop-editor-rest.b64
           rm -f .github/workflows/temporary-source-export.yml preview/trigger-source-export.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
