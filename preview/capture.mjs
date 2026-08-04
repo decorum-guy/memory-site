@@ -46,13 +46,22 @@ if (!croppedPhotoPosition.includes("24%") || !croppedPhotoPosition.includes("72%
 }
 const selectedVideoPreview = desktop.locator('[data-media-key="d05"] video').first();
 await selectedVideoPreview.waitFor({ state: "attached" });
-await selectedVideoPreview.evaluate((video) => new Promise((resolve) => {
-  if (video.readyState >= 2) resolve();
-  else {
-    video.addEventListener("loadeddata", resolve, { once: true });
-    window.setTimeout(resolve, 3000);
-  }
-}));
+await selectedVideoPreview.evaluate((video, expected) => new Promise((resolve, reject) => {
+  const deadline = performance.now() + 6000;
+  const check = () => {
+    if (Math.abs(video.currentTime - expected) <= .35 && video.readyState >= 2) {
+      resolve();
+      return;
+    }
+    if (performance.now() >= deadline) {
+      reject(new Error(`Timed out waiting for selected frame ${expected}; current=${video.currentTime}; readyState=${video.readyState}`));
+      return;
+    }
+    window.setTimeout(check, 80);
+  };
+  ["loadedmetadata", "loadeddata", "seeked", "timeupdate", "canplay"].forEach((name) => video.addEventListener(name, check));
+  check();
+}), 1.2);
 const selectedVideoState = await selectedVideoPreview.evaluate((video) => ({
   currentTime: video.currentTime,
   objectPosition: getComputedStyle(video).objectPosition

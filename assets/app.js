@@ -304,10 +304,10 @@
     if (useSelectedVideoFrame) {
       media.muted = true;
       media.playsInline = true;
-      media.preload = "metadata";
+      media.preload = "auto";
       media.poster = item.poster || "";
       media.src = item.src || "";
-      seekPreviewVideo(media, item.posterTime);
+      media.dataset.posterTime = String(item.posterTime);
     } else {
       media.src = item.thumb || item.poster || item.src || "";
       media.alt = isCensored ? "Скрытое воспоминание" : (item.alt || (item.kind === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний"));
@@ -321,6 +321,7 @@
     media.addEventListener("error", () => frame.classList.add("is-missing"));
     media.addEventListener(useSelectedVideoFrame ? "loadeddata" : "load", () => frame.classList.remove("is-missing"));
     frame.append(media, placeholder);
+    if (useSelectedVideoFrame) seekPreviewVideo(media, item.posterTime);
 
     if (item.kind === "live") {
       const badge = document.createElement("span");
@@ -344,15 +345,32 @@
   }
 
   function seekPreviewVideo(video, time) {
+    const requested = Math.max(0, Number(time) || 0);
+    let attempts = 0;
     const seek = () => {
+      if (!video.isConnected && attempts < 8) {
+        attempts += 1;
+        window.setTimeout(seek, 40 * attempts);
+        return;
+      }
       const duration = Number.isFinite(video.duration) ? video.duration : Infinity;
-      const requested = Math.max(0, Number(time) || 0);
       const safe = duration === Infinity ? requested : Math.min(requested, Math.max(0, duration - .01));
-      try { video.currentTime = safe; }
-      catch (_) { /* metadata may arrive on the next tick */ }
+      try {
+        if (Math.abs(video.currentTime - safe) > .03) video.currentTime = safe;
+        video.pause();
+      } catch (_) {
+        if (attempts < 8) {
+          attempts += 1;
+          window.setTimeout(seek, 60 * attempts);
+        }
+      }
     };
-    if (video.readyState >= 1) seek();
-    else video.addEventListener("loadedmetadata", seek, { once: true });
+    ["loadedmetadata", "loadeddata", "canplay"].forEach((name) => video.addEventListener(name, seek));
+    video.addEventListener("seeked", () => {
+      video.pause();
+      video.dataset.frameReady = "1";
+    });
+    requestAnimationFrame(seek);
   }
 
   function renderRail() {
