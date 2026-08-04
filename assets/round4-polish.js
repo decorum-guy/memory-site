@@ -54,21 +54,34 @@
     function bindReliableChapterState() {
       const pages = [...document.querySelectorAll("#memory-book > .memory-page")];
       const links = [...document.querySelectorAll("#chapter-rail a")];
-      if (!pages.length || !links.length) return;
+      const rail = document.getElementById("chapter-rail");
+      if (!pages.length || !links.length || !rail) return;
       let frame = 0;
-      const update = () => {
-        frame = 0;
+      let applying = false;
+      const activeIndex = () => {
         const anchor = window.scrollY + Math.min(window.innerHeight * .34, 360);
         let active = 0;
         pages.forEach((page, index) => { if (page.offsetTop <= anchor) active = index; });
+        return active;
+      };
+      const update = () => {
+        frame = 0;
+        applying = true;
+        const active = activeIndex();
         links.forEach((link, index) => link.classList.toggle("is-active", index === active));
+        applying = false;
       };
       const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
       window.addEventListener("scroll", schedule, { passive: true });
       window.addEventListener("resize", schedule);
       window.addEventListener("hashchange", schedule);
+      new MutationObserver(() => {
+        if (!applying) schedule();
+      }).observe(rail, { subtree: true, attributes: true, attributeFilter: ["class"] });
       links[0].classList.add("is-active");
       update();
+      window.setTimeout(update, 0);
+      window.setTimeout(update, 180);
     }
 
     function captionSize(text) {
