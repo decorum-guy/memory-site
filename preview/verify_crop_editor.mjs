@@ -40,6 +40,19 @@ try {
   reader.setDefaultTimeout(15000);
   await reader.goto(`${base}/?opened=1#ordinary-days`, { waitUntil: "networkidle" });
 
+  const cursorState = await reader.evaluate(() => ({
+    finePointer: matchMedia("(hover: hover) and (pointer: fine)").matches,
+    bodyCursor: getComputedStyle(document.body).cursor,
+    openButtonCursor: getComputedStyle(document.getElementById("open-book")).cursor,
+    stylesheetLoaded: [...document.styleSheets].some((sheet) =>
+      String(sheet.href || "").includes("cursor-scrapbook-pencil-final-v19.css")
+    ),
+  }));
+  assert(cursorState.stylesheetLoaded, `custom cursor stylesheet was not loaded: ${JSON.stringify(cursorState)}`);
+  assert(cursorState.finePointer, `desktop Chromium did not expose a fine pointer: ${JSON.stringify(cursorState)}`);
+  assert(cursorState.bodyCursor.includes("scrapbook-pencil-final-v19"), `custom body cursor was not applied: ${JSON.stringify(cursorState)}`);
+  assert(cursorState.openButtonCursor.includes("scrapbook-pencil-final-v19"), `custom interactive cursor was not applied: ${JSON.stringify(cursorState)}`);
+
   const croppedPhoto = reader.locator('[data-media-key="d02"] img').first();
   await croppedPhoto.waitFor({ state: "visible" });
   const photoPosition = await croppedPhoto.evaluate((image) => getComputedStyle(image).objectPosition);
@@ -162,6 +175,7 @@ try {
   assert(exportedText.includes('"posterTime": 2.6'), "Studio export does not contain the saved-and-exited video frame time");
 
   const report = {
+    cursorState,
     photoPosition,
     readerVideoState,
     movedPosition,
@@ -174,7 +188,7 @@ try {
     liveTimelineHidden: true,
   };
   await fs.writeFile(path.join(output, "report.json"), JSON.stringify(report, null, 2), "utf8");
-  console.log("Crop editor functional verification passed", report);
+  console.log("Crop editor and cursor functional verification passed", report);
 } finally {
   await browser.close();
 }
