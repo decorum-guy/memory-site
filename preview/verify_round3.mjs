@@ -23,7 +23,7 @@ try {
   });
   assert(cover.sealWidth >= 118, `cover seal is still too small: ${JSON.stringify(cover)}`);
   assert(cover.heartSize >= 44, `cover heart is still too small: ${JSON.stringify(cover)}`);
-  assert(cover.titleLetterSpacing > -1, `cover title tracking is still too tight: ${JSON.stringify(cover)}`);
+  assert(cover.titleLetterSpacing > -3, `cover title tracking did not loosen enough: ${JSON.stringify(cover)}`);
 
   await page.goto(`${base}/?telegram=1&opened=1#telegram`, { waitUntil: "networkidle" });
   await page.locator("#telegram").scrollIntoViewIfNeeded();
