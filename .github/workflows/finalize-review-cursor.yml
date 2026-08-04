@@ -1,0 +1,95 @@
+name: Finalize review branch and install cursor
+
+on:
+  push:
+    branches: [review-round-2-polish]
+    paths:
+      - ".github/workflows/finalize-review-cursor.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review-round-2-polish
+          fetch-depth: 0
+
+      - name: Install cursor, keep focused tests, and remove temporary CI files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64
+          
+          root = Path.cwd()
+          
+          def write_b64(path, payload):
+              target = root / path
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(base64.b64decode(payload))
+          
+          write_b64("assets/cursor-scrapbook-pencil-final-v19.css", "QG1lZGlhIChob3ZlcjogaG92ZXIpIGFuZCAocG9pbnRlcjogZmluZSkgewogIGh0bWwsCiAgYm9keSwKICBib2R5ICogewogICAgY3Vyc29yOgogICAgICB1cmwoIi4vY3Vyc29ycy9zY3JhcGJvb2stcGVuY2lsLWZpbmFsLXYxOS5zdmciKSAyIDMwLAogICAgICB1cmwoIi4vY3Vyc29ycy9zY3JhcGJvb2stcGVuY2lsLWZpbmFsLXYxOS5wbmciKSAyIDMwLAogICAgICBhdXRvOwogIH0KCiAgaW5wdXQsCiAgdGV4dGFyZWEsCiAgW2NvbnRlbnRlZGl0YWJsZT0idHJ1ZSJdIHsKICAgIGN1cnNvcjogdGV4dDsKICB9Cn0K")
+          write_b64("assets/cursors/scrapbook-pencil-final-v19.svg", "PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEuNjE3MDkgMzAuODA5N0w0LjI3NzY3IDIwLjM5MzRMMTEuODE3MiAyNy4zOTRMMi4zMzQgMzAuMDk3MUwxLjYxNzA5IDMwLjgwOTdaIiBmaWxsPSIjRUJDOTkwIiBzdHJva2U9IiM1NzM5MUYiIHN0cm9rZS13aWR0aD0iMS4xNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0yLjMzNCAzMC4wOTcxTDMuNDM2MDMgMjcuNTYxNkw0LjgyNDQ0IDI4Ljc0NUwyLjMzNCAzMC4wOTcxWiIgZmlsbD0iIzMwMkIyNyIgc3Ryb2tlPSIjMzAyQjI3IiBzdHJva2Utd2lkdGg9IjAuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik00LjQxMDE2IDIwLjJMMTguMTEwMiA2LjQzMDAxTDI1LjM2MDIgMTMuMzNMMTEuOTUwMiAyNy4yTDQuNDEwMTYgMjAuMloiIGZpbGw9IiNFNzgzMkQiIHN0cm9rZT0iIzU3MzkxRiIgc3Ryb2tlLXdpZHRoPSIxLjE1IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPHBhdGggZD0iTTYuNzAwMiAyMS4yTDE5LjEzMDIgOC43NUwyMC43MzAyIDEwLjM1TDguMzUwMTkgMjIuODVMNi43MDAyIDIxLjJaIiBmaWxsPSIjRjhCMTRFIi8+CjxwYXRoIG9wYWNpdHk9IjAuNDgiIGQ9Ik05LjcwMDIgMjQuNDVMMjMuMTEwMiAxMS4wM0wyNS4zNjAyIDEzLjMzTDExLjk1MDIgMjcuMkw5LjcwMDIgMjQuNDVaIiBmaWxsPSIjQjk1RDIwIi8+CjxwYXRoIGQ9Ik0xNi40MTAyIDguMTRMMTkuMTEwMiA1LjQ0TDI2LjMxMDIgMTIuMzRMMjMuNTYwMiAxNS4xNEwxNi40MTAyIDguMTRaIiBmaWxsPSIjQzlCODlEIiBzdHJva2U9IiM1NzM5MUYiIHN0cm9rZS13aWR0aD0iMS4xNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0yNi44NCAxMS44TDI5Ljc5IDguNzlDMzAuMTcgOC40MDMzNCAzMC4xNjY3IDguMDE2NjcgMjkuNzggNy42M0wyMy44MyAxLjhDMjMuNDM2NyAxLjQxMzM0IDIzLjA1IDEuNDE2NjcgMjIuNjcgMS44MUwxOS43MiA0LjgyQzE5LjM0IDUuMjA2NjcgMTkuMzQzNCA1LjU5MzM0IDE5LjczIDUuOThMMjUuNjggMTEuODFDMjYuMDczNCAxMi4xOSAyNi40NiAxMi4xODY3IDI2Ljg0IDExLjhaIiBmaWxsPSIjRDk3NDVFIiBzdHJva2U9IiM1NzM5MUYiIHN0cm9rZS13aWR0aD0iMS4xNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxnIG9wYWNpdHk9IjAuNSI+CjxwYXRoIGQ9Ik03Ljk1MDIgMjIuMjVMMTguNTIwMiAxMS40NyIgc3Ryb2tlPSIjN0I0QTI0IiBzdHJva2Utd2lkdGg9IjAuMzQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8cGF0aCBkPSJNMTAgMjNMMjAgMTMiIHN0cm9rZT0iIzdCNEEyNCIgc3Ryb2tlLXdpZHRoPSIwLjM0IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPC9nPgo8L3N2Zz4K")
+          write_b64("assets/cursors/scrapbook-pencil-final-v19.png", "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAGKklEQVR42sVXS4xVVRR+77n3fY7zwDAjCq2AqqhVWhvTGBMTE01iY2KMSW00JjHGRLQxLljY+JgYa4zGhMSYhH5QY4wJ0TA0TiE8ZkaUaRYZehkYHs7c57c5x9feOXdvPlrpu06e3J+99/f+c8/5z8XwP8l/7mCGD0wAMDS9ivzwAcvMn4ug8SBAM8JW9S2N+9B3i9qLJ1hT1mB4aAnKOLWbXn2w7u/ICwXAQTCuKieL6kCBlxVZCYnLepgH/P7wGr03w+VupT1HGT0hgDM/OktwN4Q1A5T2xOWBEEr9wCxBZ/G7NNDv65fIb8mWZjX9gxwJ4BozT92zY9vvM3gB5UXit7YgVnAHpv7fi1zdwn+fFo4H5/XLu3W20NBIbBcbxYIYgEXoMwI4jvj9fpQqH0HTeaBpQimwF7pH2HjXJJPn1RrBHxPwgoD1YP+GvVycMmOKkFrRkGxZ6gzB+ZjjgcGzqMlEKCNbbzAvjclg4CDgP6F5XcCjr5ewsvx2PGa0LBs9XQVcLoBrxOQe8g7r+bAxw1Hyb6BN0VIg1cH0Ssv8Vv0Ff0EfY7OuwpehPghdAfhB9En0d9Cv0a9Ay7dGlsk86tBQqwkgWk8XMZCJgGHAW2wqYIsN1GbAqEDhV7Yh1t9d75bSjFgihb4Zgk0xxbgMIbB/AzXK9J8F4pQYETgPvlbQ7ZK1zr3X2fXzBjws+MWTBAhL5FkMQ2j1pSgQ2Z7g3M7XCGDQJSnErPcqmxPSs8P3uxl3F/euG+FV5o5r6ahnc10Y0bY4QM7ovlPQUkQwsAsNZXxEUnTZAUs0ypXHeLxvUXogQEf8nNfD40fLVxfnJEpnHytx65L/o2cIKCZ0mQBE9qVQa6Z6jJ/PwNhsmv6bf7ZXAOqFwV3Hi1iJFKpmLyNLLYehy3v1fh+f+nnw95b4SmijOqQdlT4BnLWlHwwCLnBc1fDP0XdGvMHT7FM1s+NNSR/TTD2VVvK8RuX1MsclmgBcCbjcJ2u+ZL44RCqIPGEg2j8lsDxgwvG4iP1qskSP6f5Vf8y7feXCvJ2n2wzgFx3wQ3r+ZmJ5DLmipKNO4fcFLd/C7JVCqzPK8YMEaJYEzl+8X8QQj8H1BLuX8GzYBZejhFviG/CRrI2CYPJFwsgk8R3f8xW0+X3vXJdC77ILxX8DTNw3gPtlfKcGLFVhSg5fLQK1YfU6V4G0Qci4Gz/PQuI3fnoL3XClWFxwXTw9KwR2lrnH4L1/rEazCQ+BnczC5F2r6o69v7OTK9qvVIHv6ZAuIhYngORbkPYHtNyjsDjT0BrbZIp4C0KVC/1hZ1A2F11+gvFvQLtF4Ee2PNb8rBtcA78uxi8CysEtoFbFynxPp3k6t1a7K4T1TybZHZN/gBzY00LfDj/7Hnlpd1xC9yHZi3qV7CGaF+gY56AnFoLgjBD30u60EVmGeocVBv+6c8DE5Uks/O2AnJg3ozdbRXUDLBF4XgY/hvCfwl1me3qZDwRfwSBF8D+k3w4Un8Mb3+G8u3vM9XMTs7e6Nt5U2ccXUS9y8HK5vpZpPpRj+3uIXCi7CPUrBDY00m/gs+et1krS9u0dQfBWJZlMGj4i6BzQfCxgOtkvS5MjeotuoLuQ5Ry2T+tE7rW7mA4d4Hy7epjZ9gNnaSko1em+57xP6+vBicRB/PFZeA72deVQZJE2KfpOIyJRmtqCuNMh+UeNiicdbeI7xWG9WCb0wNpg8dTj9Htl5EvCKi8WDk/A59xY3jQgxLqfCC5Mb5YOqP4l4NXg8xE/GhC5v7p4IP6Vj3yviBD7j5gZecvaFFeD+0iK1vrHjXXCPN3yVhM1Ja95TPWJzo/YfBc8Hngyh0gCAAAAASUVORK5CYII=")
+          write_b64(".github/workflows/crop-editor-functional.yml", "bmFtZTogQ3JvcCBlZGl0b3IgYW5kIGN1cnNvciBmdW5jdGlvbmFsIHZlcmlmaWNhdGlvbgoKb246CiAgd29ya2Zsb3dfZGlzcGF0Y2g6CiAgcHVsbF9yZXF1ZXN0OgogICAgYnJhbmNoZXM6IFttYWluXQogICAgcGF0aHM6CiAgICAgIC0gImluZGV4Lmh0bWwiCiAgICAgIC0gImFzc2V0cy9hcHAuanMiCiAgICAgIC0gImFzc2V0cy9tZWRpYS5jc3MiCiAgICAgIC0gImFzc2V0cy9jdXJzb3ItKi5jc3MiCiAgICAgIC0gImFzc2V0cy9jdXJzb3JzLyoqIgogICAgICAtICJ0b29scy9zdHVkaW8uaHRtbCIKICAgICAgLSAicHJldmlldy9kZW1vX21lbW9yaWVzLmpzIgogICAgICAtICJwcmV2aWV3L3ZlcmlmeV9jcm9wX2VkaXRvci5tanMiCiAgICAgIC0gIi5naXRodWIvd29ya2Zsb3dzL2Nyb3AtZWRpdG9yLWZ1bmN0aW9uYWwueW1sIgoKcGVybWlzc2lvbnM6CiAgY29udGVudHM6IHJlYWQKCmpvYnM6CiAgdmVyaWZ5OgogICAgcnVucy1vbjogdWJ1bnR1LWxhdGVzdAogICAgdGltZW91dC1taW51dGVzOiAyMAogICAgc3RlcHM6CiAgICAgIC0gdXNlczogYWN0aW9ucy9jaGVja291dEB2NAogICAgICAgIHdpdGg6CiAgICAgICAgICByZWY6ICR7eyBnaXRodWIuaGVhZF9yZWYgfX0KCiAgICAgIC0gdXNlczogYWN0aW9ucy9zZXR1cC1weXRob25AdjUKICAgICAgICB3aXRoOgogICAgICAgICAgcHl0aG9uLXZlcnNpb246ICIzLjEyIgoKICAgICAgLSBuYW1lOiBHZW5lcmF0ZSBkZW1vIG1lZGlhCiAgICAgICAgcnVuOiB8CiAgICAgICAgICBweXRob24gLW0gcGlwIGluc3RhbGwgLS1kaXNhYmxlLXBpcC12ZXJzaW9uLWNoZWNrIFBpbGxvdyBxcmNvZGUKICAgICAgICAgIHB5dGhvbiBwcmV2aWV3L2dlbmVyYXRlX2RlbW9fbWVkaWEucHkKICAgICAgICAgIHB5dGhvbiBwcmV2aWV3L2dlbmVyYXRlX2V4dHJhX21lZGlhLnB5CiAgICAgICAgICBpZiAhIGNvbW1hbmQgLXYgZmZtcGVnID4vZGV2L251bGwgMj4mMTsgdGhlbgogICAgICAgICAgICBzdWRvIGFwdC1nZXQgdXBkYXRlCiAgICAgICAgICAgIHN1ZG8gYXB0LWdldCBpbnN0YWxsIC15IGZmbXBlZwogICAgICAgICAgZmkKICAgICAgICAgIGZmbXBlZyAtaGlkZV9iYW5uZXIgLWxvZ2xldmVsIGVycm9yIC15IFwKICAgICAgICAgICAgLWxvb3AgMSAtaSBwcmV2aWV3L2RlbW8tbWVkaWEvdmlkZW8tcG9zdGVyLmpwZyBcCiAgICAgICAgICAgIC12ZiAic2NhbGU9MTI4MDotMix6b29tcGFuPXo9J21pbih6b29tKzAuMDAwOCwxLjA4KSc6ZD0xMjA6cz0xMjgweDg1NDpmcHM9MzAiIFwKICAgICAgICAgICAgLXQgNCAtYW4gLWM6diBsaWJ2cHgtdnA5IC1iOnYgMCAtY3JmIDM0IC1waXhfZm10IHl1djQyMHAgXAogICAgICAgICAgICBwcmV2aWV3L2RlbW8tbWVkaWEvZGVtby12aWRlby53ZWJtCiAgICAgICAgICBjcCBwcmV2aWV3L2RlbW9fbWVtb3JpZXMuanMgY29udGVudC9tZW1vcmllcy5qcwoKICAgICAgLSB1c2VzOiBhY3Rpb25zL3NldHVwLW5vZGVAdjQKICAgICAgICB3aXRoOgogICAgICAgICAgbm9kZS12ZXJzaW9uOiAiMjAiCgogICAgICAtIG5hbWU6IEluc3RhbGwgQ2hyb21pdW0KICAgICAgICBydW46IHwKICAgICAgICAgIG5wbSBpbml0IC15ID4vZGV2L251bGwgMj4mMQogICAgICAgICAgbnBtIGluc3RhbGwgLS1uby1hdWRpdCAtLW5vLWZ1bmQgcGxheXdyaWdodEAxLjU0LjIKICAgICAgICAgIG5weCBwbGF5d3JpZ2h0IGluc3RhbGwgLS13aXRoLWRlcHMgY2hyb21pdW0KCiAgICAgIC0gbmFtZTogUnVuIGZvY3VzZWQgZnVuY3Rpb25hbCB2ZXJpZmljYXRpb24KICAgICAgICBydW46IHwKICAgICAgICAgIHB5dGhvbjMgLW0gaHR0cC5zZXJ2ZXIgNDE3MyAtLWJpbmQgMTI3LjAuMC4xID4vdG1wL21lbW9yeS1zaXRlLXNlcnZlci5sb2cgMj4mMSAmCiAgICAgICAgICBmb3IgYXR0ZW1wdCBpbiB7MS4uMzB9OyBkbwogICAgICAgICAgICBjdXJsIC0tZmFpbCAtLXNpbGVudCBodHRwOi8vMTI3LjAuMC4xOjQxNzMvID4vZGV2L251bGwgJiYgYnJlYWsKICAgICAgICAgICAgc2xlZXAgMQogICAgICAgICAgZG9uZQogICAgICAgICAgbm9kZSBwcmV2aWV3L3ZlcmlmeV9jcm9wX2VkaXRvci5tanMKCiAgICAgIC0gdXNlczogYWN0aW9ucy91cGxvYWQtYXJ0aWZhY3RAdjQKICAgICAgICBpZjogYWx3YXlzKCkKICAgICAgICB3aXRoOgogICAgICAgICAgbmFtZTogY3JvcC1lZGl0b3ItZnVuY3Rpb25hbC1yZXBvcnQKICAgICAgICAgIHBhdGg6IHByZXZpZXcvY3JvcC12ZXJpZmljYXRpb24tb3V0cHV0CiAgICAgICAgICBpZi1uby1maWxlcy1mb3VuZDogd2FybgogICAgICAgICAgcmV0ZW50aW9uLWRheXM6IDE0Cg==")
+          
+          index = root / "index.html"
+          text = index.read_text(encoding="utf-8")
+          link = '  <link rel="stylesheet" href="assets/cursor-scrapbook-pencil-final-v19.css" />\n'
+          anchor = '  <link rel="stylesheet" href="assets/shared-and-telegram.css" />\n'
+          if link not in text:
+              if anchor not in text:
+                  raise SystemExit("index stylesheet anchor not found")
+              text = text.replace(anchor, anchor + link)
+          index.write_text(text, encoding="utf-8")
+          
+          verify = root / "preview/verify_crop_editor.mjs"
+          text = verify.read_text(encoding="utf-8")
+          needle = '  await reader.goto(`${base}/?opened=1#ordinary-days`, { waitUntil: "networkidle" });\n\n  const croppedPhoto ='
+          insert = '  await reader.goto(`${base}/?opened=1#ordinary-days`, { waitUntil: "networkidle" });\n\n'     '  const cursorState = await reader.evaluate(() => ({\n'     '    finePointer: matchMedia("(hover: hover) and (pointer: fine)").matches,\n'     '    bodyCursor: getComputedStyle(document.body).cursor,\n'     '    openButtonCursor: getComputedStyle(document.getElementById("open-book")).cursor,\n'     '    stylesheetLoaded: [...document.styleSheets].some((sheet) =>\n'     '      String(sheet.href || "").includes("cursor-scrapbook-pencil-final-v19.css")\n'     '    ),\n'     '  }));\n'     '  assert(cursorState.stylesheetLoaded, `custom cursor stylesheet was not loaded: ${JSON.stringify(cursorState)}`);\n'     '  assert(cursorState.finePointer, `desktop Chromium did not expose a fine pointer: ${JSON.stringify(cursorState)}`);\n'     '  assert(cursorState.bodyCursor.includes("scrapbook-pencil-final-v19"), `custom body cursor was not applied: ${JSON.stringify(cursorState)}`);\n'     '  assert(cursorState.openButtonCursor.includes("scrapbook-pencil-final-v19"), `custom interactive cursor was not applied: ${JSON.stringify(cursorState)}`);\n\n'     '  const croppedPhoto ='
+          if "const cursorState =" not in text:
+              if needle not in text:
+                  raise SystemExit("verify cursor insertion anchor not found")
+              text = text.replace(needle, insert)
+          report_needle = '    photoPosition,\n    readerVideoState,'
+          if "    cursorState," not in text:
+              if report_needle not in text:
+                  raise SystemExit("verify report anchor not found")
+              text = text.replace(report_needle, '    cursorState,\n' + report_needle)
+          verify.write_text(text, encoding="utf-8")
+          
+          checklist = root / "REVIEW_ROUND_2_CHECKLIST.md"
+          if checklist.exists():
+              current = checklist.read_text(encoding="utf-8")
+              if "## Кадрирование и кастомный курсор" not in current:
+                  checklist.write_text(current + '\n\n## Кадрирование и кастомный курсор\n\n- [ ] Навести курсор на фото, видео и Live Photo в Studio: появляется кнопка настройки кадра.\n- [ ] Перетащить фото внутри полароида, сохранить, открыть повторно и проверить сохранённое положение.\n- [ ] Изменить положение и нажать «Отмена»: предыдущее сохранённое положение не меняется.\n- [ ] Для видео выбрать кадр по таймлайну и проверить «Сохранить», «Сохранить и выйти» и «Отмена».\n- [ ] Для Live Photo доступно кадрирование статичного фото, но нет таймлайна обычного видео.\n- [ ] На десктопе книга использует оранжевый карандаш с hotspot на грифеле; в Studio остаётся системный курсор.\n- [ ] На тач-устройстве кастомный курсор не влияет на интерфейс.\n', encoding="utf-8")
+          
+          verification = root / "preview/CROP_EDITOR_VERIFICATION.md"
+          if verification.exists():
+              current = verification.read_text(encoding="utf-8")
+              if "## Cursor verification" not in current:
+                  verification.write_text(current + '\n\n## Cursor verification\n\nThe focused Chromium test also verifies that the cursor stylesheet is loaded and that the pencil cursor is applied to the book and its interactive controls on fine-pointer devices. Studio intentionally keeps the system cursor.\n', encoding="utf-8")
+          
+          for rel in [
+              ".github/workflows/temporary-capture-visibility-fix.yml",
+              ".github/workflows/temporary-current-head-crop-verification.yml",
+              "preview/trigger-capture-visibility-fix.txt",
+              "preview/trigger-current-head-crop-verification.txt",
+              "tools/temporary_capture_visibility_patch.py",
+              ".github/workflows/finalize-review-cursor.yml",
+          ]:
+              path = root / rel
+              if path.exists():
+                  path.unlink()
+          PY
+
+      - name: Commit clean review state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add custom cursor and finalize crop editor review"
+          git push origin HEAD:review-round-2-polish
