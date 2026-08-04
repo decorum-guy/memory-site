@@ -19,7 +19,6 @@
   let censorshipOff = queryCensorshipOff || sessionCensorshipOff || defaultOff;
   const censoredCount = countCensored(book);
   window.MEMORY_CENSORSHIP_OFF = censorshipOff;
-  document.documentElement.classList.toggle("censorship-off", censorshipOff);
 
   document.addEventListener("DOMContentLoaded", function () {
     renderSharedAlbum();
@@ -36,24 +35,28 @@
     censorButton.addEventListener("click", function () {
       const scrollX = window.scrollX;
       const scrollY = window.scrollY;
+      const root = document.documentElement;
+      const previousOverflowAnchor = root.style.overflowAnchor;
+      const previousScrollBehavior = root.style.scrollBehavior;
+
+      // DOM changes inside the current chapter must not trigger browser scroll anchoring.
+      root.style.overflowAnchor = "none";
+      root.style.scrollBehavior = "auto";
+
       censorshipOff = !censorshipOff;
       window.MEMORY_CENSORSHIP_OFF = censorshipOff;
-      document.documentElement.classList.toggle("censorship-off", censorshipOff);
-
-      const nextUrl = new URL(window.location.href);
-      if (censorshipOff) {
-        safeSessionSet(storageKey, "1");
-        nextUrl.searchParams.set("censor", "off");
-      } else {
-        safeSessionRemove(storageKey);
-        nextUrl.searchParams.delete("censor");
-      }
-      try { history.replaceState(history.state, "", nextUrl); }
-      catch (_) { /* file:// keeps working even when history is restricted */ }
+      if (censorshipOff) safeSessionSet(storageKey, "1");
+      else safeSessionRemove(storageKey);
 
       updateCensorButton();
       document.dispatchEvent(new CustomEvent("memory:censorship-change", { detail: { off: censorshipOff } }));
-      requestAnimationFrame(() => window.scrollTo(scrollX, scrollY));
+
+      // Restore before the browser gets a chance to paint a temporary jump.
+      window.scrollTo({ left: scrollX, top: scrollY, behavior: "auto" });
+      requestAnimationFrame(() => {
+        root.style.overflowAnchor = previousOverflowAnchor;
+        root.style.scrollBehavior = previousScrollBehavior;
+      });
     });
 
     const topButton = document.createElement("button");
@@ -135,6 +138,6 @@
   function safeSessionSet(key, value) { try { window.sessionStorage.setItem(key, value); } catch (_) {} }
   function safeSessionRemove(key) { try { window.sessionStorage.removeItem(key); } catch (_) {} }
   function prefersReducedMotion() { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; }
-  function escapeHtml(value) { return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+  function escapeHtml(value) { return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;"); }
   function escapeAttr(value) { return escapeHtml(value).replace(/`/g, "&#096;"); }
 })();
