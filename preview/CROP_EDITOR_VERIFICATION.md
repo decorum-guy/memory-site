@@ -12,11 +12,16 @@ Focused Chromium verification exercises the Studio crop and video-frame editor e
 - exported `memories.js` contains `crop` and `posterTime`;
 - Live Photo opens the same crop editor without the regular-video timeline.
 
-The same test verifies the custom pencil cursor:
+A dedicated cursor-state test verifies the custom pencil end to end:
 
 - its stylesheet is loaded by `index.html`;
-- a desktop fine-pointer environment receives the cursor on the book and interactive controls;
-- the cursor URL resolves to `scrapbook-pencil-final-v19.svg` with PNG fallback;
-- Memory Studio intentionally keeps the system cursor.
+- a desktop fine-pointer environment receives the basic pencil cursor on the book;
+- interactive controls switch to the aligned hover pencil;
+- pressing an interactive control switches to the aligned active pencil;
+- all three states use the same `12 48` graphite-tip hotspot on a 64×64 canvas;
+- all three SVG assets return HTTP 200 and contain data;
+- the exact uploaded PNG versions remain embedded as fallbacks in CSS;
+- text fields retain the native text cursor;
+- Memory Studio intentionally keeps the system cursor for precise crop and timeline work.
 
 The CI fixture uses VP9/WebM because open-source Chromium on GitHub Actions does not bundle the proprietary H.264 decoder. Production MP4 files remain unchanged and are supported by Chrome, Yandex Browser and Safari.
