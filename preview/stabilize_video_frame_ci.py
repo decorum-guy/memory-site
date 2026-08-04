@@ -1,5 +1,40 @@
 from pathlib import Path
 
+OLD_NUDGE = '''  const nudgeDecode = async () => {
+    if (nudging || video.readyState < 1 || settled) return;
+    nudging = true;
+    video.muted = true;
+    try { await video.play(); } catch {}
+    try {
+      if (typeof video.fastSeek === "function") video.fastSeek(expected);
+      else video.currentTime = expected;
+    } catch {}
+    window.setTimeout(() => { nudging = false; }, 300);
+  };'''
+
+NEW_NUDGE = '''  const nudgeDecode = async () => {
+    if (nudging || settled) return;
+    nudging = true;
+    video.muted = true;
+    video.preload = "auto";
+
+    const seekFrame = async () => {
+      try { await video.play(); } catch {}
+      try {
+        if (typeof video.fastSeek === "function") video.fastSeek(expected);
+        else video.currentTime = expected;
+      } catch {}
+    };
+
+    if (video.readyState >= 1) {
+      await seekFrame();
+    } else {
+      video.addEventListener("loadedmetadata", () => { void seekFrame(); }, { once: true });
+      try { video.load(); } catch {}
+    }
+    window.setTimeout(() => { nudging = false; }, 1200);
+  };'''
+
 ROBUST_WAIT = '''await {locator}.evaluate((video, expected) => new Promise((resolve, reject) => {{
   const started = performance.now();
   const deadline = started + 15000;
@@ -29,15 +64,26 @@ ROBUST_WAIT = '''await {locator}.evaluate((video, expected) => new Promise((reso
   }};
 
   const nudgeDecode = async () => {{
-    if (nudging || video.readyState < 1 || settled) return;
+    if (nudging || settled) return;
     nudging = true;
     video.muted = true;
-    try {{ await video.play(); }} catch {{}}
-    try {{
-      if (typeof video.fastSeek === "function") video.fastSeek(expected);
-      else video.currentTime = expected;
-    }} catch {{}}
-    window.setTimeout(() => {{ nudging = false; }}, 300);
+    video.preload = "auto";
+
+    const seekFrame = async () => {{
+      try {{ await video.play(); }} catch {{}}
+      try {{
+        if (typeof video.fastSeek === "function") video.fastSeek(expected);
+        else video.currentTime = expected;
+      }} catch {{}}
+    }};
+
+    if (video.readyState >= 1) {{
+      await seekFrame();
+    }} else {{
+      video.addEventListener("loadedmetadata", () => {{ void seekFrame(); }}, {{ once: true }});
+      try {{ video.load(); }} catch {{}}
+    }}
+    window.setTimeout(() => {{ nudging = false; }}, 1200);
   }};
 
   const check = () => {{
@@ -59,9 +105,13 @@ ROBUST_WAIT = '''await {locator}.evaluate((video, expected) => new Promise((reso
 }}), 1.2);'''
 
 
+def upgrade_existing_wait(text: str) -> str:
+    return text.replace(OLD_NUDGE, NEW_NUDGE)
+
+
 def patch_focused_verification() -> None:
     path = Path("preview/verify_crop_editor.mjs")
-    text = path.read_text(encoding="utf-8")
+    text = upgrade_existing_wait(path.read_text(encoding="utf-8"))
     old = '''  const selectedVideo = reader.locator('[data-media-key="d05"] video').first();
   await selectedVideo.scrollIntoViewIfNeeded();
   await reader.waitForFunction(() => {
@@ -73,14 +123,15 @@ def patch_focused_verification() -> None:
   await selectedVideo.scrollIntoViewIfNeeded();
   ''' + ROBUST_WAIT.format(locator="selectedVideo")
     if old in text:
-        path.write_text(text.replace(old, new, 1), encoding="utf-8")
+        text = text.replace(old, new, 1)
     elif "const started = performance.now();" not in text:
         raise SystemExit("focused selected-video block not found")
+    path.write_text(text, encoding="utf-8")
 
 
 def patch_design_capture() -> None:
     path = Path("preview/capture.mjs")
-    text = path.read_text(encoding="utf-8")
+    text = upgrade_existing_wait(path.read_text(encoding="utf-8"))
     old = '''await selectedVideoPreview.evaluate((video, expected) => new Promise((resolve, reject) => {
   const deadline = performance.now() + 12000;
   const check = () => {
