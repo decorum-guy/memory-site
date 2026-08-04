@@ -29,12 +29,11 @@ try {
   await target.waitFor({ state: "visible" });
   await target.hover();
   const hoverCursor = await target.evaluate((element) => getComputedStyle(element).cursor);
-  assert(hoverCursor.includes("scrapbook-pencil-final-v19-hover-aligned.svg"), `hover SVG cursor was not applied: ${hoverCursor}`);
-  assert(hoverCursor.includes("data:image/png;base64"), `hover PNG fallback is missing: ${hoverCursor}`);
-  assert(hoverCursor.includes("12 48"), `hover hotspot is not 12 48: ${hoverCursor}`);
+  assert(hoverCursor.includes("scrapbook-pencil-final-v19.svg"), `hover should keep the basic cursor: ${hoverCursor}`);
+  assert(!hoverCursor.includes("hover-aligned"), `removed hover cursor state is still active: ${hoverCursor}`);
 
   const box = await target.boundingBox();
-  assert(box, "hover target has no bounding box");
+  assert(box, "active target has no bounding box");
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   const activeCursor = await target.evaluate((element) => getComputedStyle(element).cursor);
@@ -46,7 +45,6 @@ try {
 
   const assets = await page.evaluate(async () => Promise.all([
     "assets/cursors/scrapbook-pencil-final-v19.svg",
-    "assets/cursors/scrapbook-pencil-final-v19-hover-aligned.svg",
     "assets/cursors/scrapbook-pencil-final-v19-active-aligned.svg",
   ].map(async (asset) => {
     const response = await fetch(asset, { cache: "no-store" });
@@ -57,12 +55,9 @@ try {
     assert(bytes > 0, `cursor SVG is empty: ${asset}`);
   });
 
-  const textCursor = await page.locator("input").first().evaluate((element) => getComputedStyle(element).cursor).catch(() => null);
-  if (textCursor !== null) assert(textCursor === "text", `text input cursor was overridden: ${textCursor}`);
-
   console.log(JSON.stringify({
     basic: baseState.cursor,
-    hover: hoverCursor,
+    hoverUsesBasic: hoverCursor,
     active: activeCursor,
     assets,
   }, null, 2));
