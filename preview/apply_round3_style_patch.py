@@ -73,4 +73,16 @@ if count == 0 and "hover-aligned.svg" in text:
     raise SystemExit("Could not remove hover cursor rule")
 cursor.write_text(text, encoding="utf-8")
 
-print("Round 3 style patch applied")
+studio = Path("tools/telegram_studio.html")
+studio_text = studio.read_text(encoding="utf-8")
+if "article.innerHTML+=" in studio_text:
+    studio_text, count = re.subn(
+        r"article\.innerHTML\+=(`[^\n]*`);",
+        r'article.insertAdjacentHTML("beforeend", \1);',
+        studio_text,
+    )
+    if count != 2:
+        raise SystemExit(f"Expected to patch two Telegram Studio renderers, patched {count}")
+    studio.write_text(studio_text, encoding="utf-8")
+
+print("Round 3 style and Studio patch applied")
