@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Открытие Memory Studio и безопасное применение экспортированного memories.js."""
+"""Открытие Memory Studio и безопасное применение экспортированного memories.js.
+
+Экспорт сохраняет дополнительные метаданные Studio, включая crop и posterTime.
+"""
 from __future__ import annotations
 
 import argparse
