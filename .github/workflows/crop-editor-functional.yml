@@ -1,4 +1,4 @@
-name: Crop editor and cursor functional verification
+name: Crop editor, cursor and Telegram functional verification
 
 on:
   workflow_dispatch:
@@ -8,34 +8,84 @@ on:
       - "index.html"
       - "assets/app.js"
       - "assets/media.css"
+      - "assets/styles.css"
+      - "assets/shared-and-telegram.css"
+      - "assets/telegram-enhancements.js"
       - "assets/cursor-*.css"
       - "assets/cursors/**"
+      - "content/telegram.js"
       - "tools/studio.html"
+      - "tools/telegram_server.py"
+      - "tools/telegram_studio.html"
       - "preview/demo_memories.js"
+      - "preview/demo_telegram.js"
       - "preview/verify_cursor_states.mjs"
       - "preview/verify_crop_editor.mjs"
-      - "preview/capture.mjs"
+      - "preview/verify_round3.mjs"
+      - "preview/apply_round3_style_patch.py"
       - ".github/workflows/crop-editor-functional.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Apply one-time round 3 style patch
+        run: |
+          python preview/apply_round3_style_patch.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/styles.css assets/media.css assets/cursor-scrapbook-pencil-final-v19.css
+          if git diff --cached --quiet; then
+            echo "Round 3 style patch already applied"
+          else
+            git commit -m "fix: polish Live Photo controls, cover and cursor [skip ci]"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          fi
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
+      - name: Validate Telegram builder
+        run: |
+          python -m pip install --disable-pip-version-check Pillow
+          python -m py_compile tools/telegram_server.py
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          spec = importlib.util.spec_from_file_location("telegram_server", Path("tools/telegram_server.py"))
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          state = module.normalize_state({
+              "title": "Test",
+              "subtitle": "Test",
+              "blocks": [
+                  {"type": "note", "text": "Напутствие", "shape": 4},
+                  {"type": "quote", "text": "Сообщение Сони", "speaker": "sonya", "screenshot": "media/telegram/test.png"},
+                  {"type": "quote", "text": "Сообщение Артёма", "speaker": "me"},
+              ],
+          })
+          modes, chapter = module.build_chapter(state)
+          assert [block["telegramKind"] for block in chapter["blocks"]] == ["note", "message", "message"]
+          assert chapter["blocks"][1]["speaker"] == "sonya"
+          assert chapter["blocks"][2]["speaker"] == "me"
+          assert chapter["blocks"][1]["screenshot"] == "media/telegram/test.png"
+          assert modes["media/telegram/test.png"] == "paper"
+          print("Telegram builder: OK")
+          PY
+
       - name: Generate demo media
         run: |
-          python -m pip install --disable-pip-version-check Pillow qrcode
+          python -m pip install --disable-pip-version-check qrcode
           python preview/generate_demo_media.py
           python preview/generate_extra_media.py
           if ! command -v ffmpeg >/dev/null 2>&1; then
@@ -48,10 +98,26 @@ jobs:
             -t 4 -an -c:v libvpx-vp9 -b:v 0 -crf 34 -pix_fmt yuv420p \
             preview/demo-media/demo-video.webm
           cp preview/demo_memories.js content/memories.js
+          cp preview/demo_telegram.js content/telegram.js
 
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+
+      - name: Validate browser scripts
+        run: |
+          node --check assets/telegram-enhancements.js
+          node --check preview/verify_cursor_states.mjs
+          node --check preview/verify_round3.mjs
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path("tools/telegram_studio.html").read_text(encoding="utf-8")
+          match = re.search(r"<script>\s*([\s\S]*?)\s*</script>", text)
+          assert match, "Telegram Studio inline script not found"
+          Path("/tmp/telegram-studio.js").write_text(match.group(1), encoding="utf-8")
+          PY
+          node --check /tmp/telegram-studio.js
 
       - name: Install Chromium
         run: |
@@ -67,12 +133,13 @@ jobs:
             sleep 1
           done
           node preview/verify_cursor_states.mjs
+          node preview/verify_round3.mjs
           node preview/verify_crop_editor.mjs
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: crop-editor-functional-report
+          name: round-3-functional-report
           path: preview/crop-verification-output
           if-no-files-found: warn
           retention-days: 14
