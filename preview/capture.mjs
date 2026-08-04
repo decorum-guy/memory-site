@@ -8,7 +8,7 @@ const base = process.env.PREVIEW_URL || "http://127.0.0.1:4173";
 await fs.rm(output, { recursive: true, force: true });
 await fs.mkdir(output, { recursive: true });
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, args: ["--autoplay-policy=no-user-gesture-required"] });
 
 async function settle(page) {
   await page.waitForLoadState("networkidle");
@@ -46,8 +46,10 @@ if (!croppedPhotoPosition.includes("24%") || !croppedPhotoPosition.includes("72%
 }
 const selectedVideoPreview = desktop.locator('[data-media-key="d05"] video').first();
 await selectedVideoPreview.waitFor({ state: "attached" });
+await selectedVideoPreview.scrollIntoViewIfNeeded();
+await desktop.waitForTimeout(250);
 await selectedVideoPreview.evaluate((video, expected) => new Promise((resolve, reject) => {
-  const deadline = performance.now() + 6000;
+  const deadline = performance.now() + 12000;
   const check = () => {
     if (Math.abs(video.currentTime - expected) <= .35 && video.readyState >= 2) {
       resolve();
