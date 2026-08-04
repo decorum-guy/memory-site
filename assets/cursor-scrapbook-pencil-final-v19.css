@@ -5,12 +5,12 @@
     cursor:
       url("./cursors/scrapbook-pencil-final-v19.svg") 2 30,
       url("./cursors/scrapbook-pencil-final-v19.png") 2 30,
-      auto;
+      auto !important;
   }
 
   input,
   textarea,
   [contenteditable="true"] {
-    cursor: text;
+    cursor: text !important;
   }
 }
