@@ -1,4 +1,10 @@
-<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="64"
+     height="64"
+     viewBox="0 0 64 64"
+     fill="none">
+<title>Scrapbook pencil cursor — basic, aligned hotspot</title>
+<g transform="matrix(1.26 0 0 1.26 9.059160 10.077654)">
 <path d="M1.61709 30.8097L4.27767 20.3934L11.8172 27.394L1.61709 30.8097Z" fill="#EBC990" stroke="#57391F" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M2.334 30.0971L3.43603 27.5616L4.82444 28.745L2.334 30.0971Z" fill="#302B27" stroke="#302B27" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M4.41016 20.2L18.1102 6.43001L25.3602 13.33L11.9502 27.2L4.41016 20.2Z" fill="#E7832D" stroke="#57391F" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
@@ -10,4 +16,6 @@
 <path d="M7.9502 22.25L18.5202 11.47" stroke="#7B4A24" stroke-width="0.34" stroke-linecap="round"/>
 <path d="M10 23L20 13" stroke="#7B4A24" stroke-width="0.34" stroke-linecap="round"/>
 </g>
+</g>
+
 </svg>
