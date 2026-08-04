@@ -70,10 +70,10 @@ window.MEMORY_BOOK = {
           layout: "collage",
           items: [
             { id: "d01", kind: "photo", src: "preview/demo-media/photo-02.jpg", thumb: "preview/demo-media/photo-02.jpg", caption: "Сначала просто кофе.", takenAt: "2023-11-18T16:21:00" },
-            { id: "d02", kind: "photo", src: "preview/demo-media/photo-03.jpg", thumb: "preview/demo-media/photo-03.jpg", caption: "Потом мы решили идти пешком.", takenAt: "2023-11-18T16:44:00" },
+            { id: "d02", kind: "photo", src: "preview/demo-media/photo-03.jpg", thumb: "preview/demo-media/photo-03.jpg", caption: "Потом мы решили идти пешком.", takenAt: "2023-11-18T16:44:00", crop: { x: 24, y: 72 } },
             { id: "d03", kind: "photo", src: "preview/demo-media/photo-04.jpg", thumb: "preview/demo-media/photo-04.jpg", caption: "Кадр, который получился случайно.", takenAt: "2023-11-18T17:10:00" },
             { id: "d04", kind: "photo", src: "preview/demo-media/photo-05.jpg", thumb: "preview/demo-media/photo-05.jpg", caption: "Тот самый десерт.", takenAt: "2023-11-18T17:48:00", censored: true },
-            { id: "d05", kind: "video", src: "preview/demo-media/demo-video.mp4", poster: "preview/demo-media/video-poster.jpg", caption: "Четыре секунды абсолютного хаоса.", duration: 4, takenAt: "2023-11-18T18:02:00" },
+            { id: "d05", kind: "video", src: "preview/demo-media/demo-video.mp4", poster: "preview/demo-media/video-poster.jpg", caption: "Четыре секунды абсолютного хаоса.", duration: 4, takenAt: "2023-11-18T18:02:00", crop: { x: 68, y: 34 }, posterTime: 1.2 },
             { id: "d06", kind: "photo", src: "preview/demo-media/photo-06.jpg", thumb: "preview/demo-media/photo-06.jpg", caption: "И спокойный финал дня.", takenAt: "2023-11-18T19:17:00" }
           ]
         },

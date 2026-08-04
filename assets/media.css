@@ -266,3 +266,24 @@
   .event-rows-2 .event-preview { min-height: 31rem; }
   .event-layout-stack .event-preview { min-height: 27rem; }
 }
+
+
+/* Studio crop settings and selected video poster frames. */
+.image-frame > video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(.92) contrast(.97);
+  transition: transform .55s cubic-bezier(.22,.68,.17,1);
+  pointer-events: none;
+}
+.image-frame.is-missing > video { display: none; }
+.image-frame.is-censored > video {
+  filter: blur(22px) saturate(.55) brightness(.72);
+  transform: scale(1.16);
+}
+.image-frame.is-revealed > video { filter: saturate(.92) contrast(.97); transform: none; }
+.event-preview__item:hover .image-frame > video,
+.event-preview__item:focus-visible .image-frame > video { transform: scale(1.035); }
+.image-frame.is-censored > video { transform: scale(1.16); }

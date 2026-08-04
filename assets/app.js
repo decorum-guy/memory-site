@@ -291,23 +291,36 @@
     const key = mediaKey(item);
     const locallyRevealed = revealedCensored.has(key);
     const isCensored = item.censored && !locallyRevealed;
+    const crop = normalizeCrop(item.crop);
     frame.className = `image-frame media-kind-${safeClass(item.kind)}`;
     frame.dataset.mediaKey = key;
     frame.classList.toggle("is-censored", isCensored);
     frame.classList.toggle("is-revealed", locallyRevealed);
 
-    const image = document.createElement("img");
-    image.src = item.thumb || item.poster || item.src || "";
-    image.alt = isCensored ? "Скрытое воспоминание" : (item.alt || (item.kind === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний"));
-    image.loading = "lazy";
-    image.decoding = "async";
+    const useSelectedVideoFrame = item.kind === "video" && item.posterTime !== null;
+    const media = document.createElement(useSelectedVideoFrame ? "video" : "img");
+    media.style.objectPosition = `${crop.x}% ${crop.y}%`;
+
+    if (useSelectedVideoFrame) {
+      media.muted = true;
+      media.playsInline = true;
+      media.preload = "metadata";
+      media.poster = item.poster || "";
+      media.src = item.src || "";
+      seekPreviewVideo(media, item.posterTime);
+    } else {
+      media.src = item.thumb || item.poster || item.src || "";
+      media.alt = isCensored ? "Скрытое воспоминание" : (item.alt || (item.kind === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний"));
+      media.loading = "lazy";
+      media.decoding = "async";
+    }
 
     const placeholder = document.createElement("span");
     placeholder.className = "image-placeholder";
     placeholder.innerHTML = `<span>файл не найден</span><small>${escapeHtml(item.src || "")}</small>`;
-    image.addEventListener("error", () => frame.classList.add("is-missing"));
-    image.addEventListener("load", () => frame.classList.remove("is-missing"));
-    frame.append(image, placeholder);
+    media.addEventListener("error", () => frame.classList.add("is-missing"));
+    media.addEventListener(useSelectedVideoFrame ? "loadeddata" : "load", () => frame.classList.remove("is-missing"));
+    frame.append(media, placeholder);
 
     if (item.kind === "live") {
       const badge = document.createElement("span");
@@ -328,6 +341,18 @@
       frame.appendChild(cover);
     }
     return frame;
+  }
+
+  function seekPreviewVideo(video, time) {
+    const seek = () => {
+      const duration = Number.isFinite(video.duration) ? video.duration : Infinity;
+      const requested = Math.max(0, Number(time) || 0);
+      const safe = duration === Infinity ? requested : Math.min(requested, Math.max(0, duration - .01));
+      try { video.currentTime = safe; }
+      catch (_) { /* metadata may arrive on the next tick */ }
+    };
+    if (video.readyState >= 1) seek();
+    else video.addEventListener("loadedmetadata", seek, { once: true });
   }
 
   function renderRail() {
@@ -525,6 +550,9 @@
     const inferred = item.kind || (item.liveVideo ? "live" : item.poster ? "video" : "photo");
     const takenAt = item.takenAt || "";
     const rawCaption = item.caption || item.note || "";
+    const posterTimeValue = item.posterTime === null || item.posterTime === undefined || item.posterTime === ""
+      ? null
+      : Number(item.posterTime);
     return {
       id: item.id || "",
       kind: inferred,
@@ -536,7 +564,18 @@
       caption: isGeneratedDateCaption(rawCaption, takenAt) ? "" : rawCaption,
       takenAt,
       duration: numberOr(item.duration, 0),
-      censored: item.censored === true
+      censored: item.censored === true,
+      crop: normalizeCrop(item.crop),
+      posterTime: Number.isFinite(posterTimeValue) && posterTimeValue >= 0 ? posterTimeValue : null
+    };
+  }
+
+  function normalizeCrop(value) {
+    const x = Number(value?.x);
+    const y = Number(value?.y);
+    return {
+      x: Number.isFinite(x) ? Math.min(100, Math.max(0, x)) : 50,
+      y: Number.isFinite(y) ? Math.min(100, Math.max(0, y)) : 50
     };
   }
 

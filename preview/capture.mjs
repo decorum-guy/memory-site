@@ -38,6 +38,32 @@ await shot(desktop, "01-cover-desktop.png", { fullPage: false });
 
 await desktop.locator("#open-book").click();
 await desktop.waitForTimeout(450);
+
+const croppedPhoto = desktop.locator('[data-media-key="d02"] img').first();
+const croppedPhotoPosition = await croppedPhoto.evaluate((element) => getComputedStyle(element).objectPosition);
+if (!croppedPhotoPosition.includes("24%") || !croppedPhotoPosition.includes("72%")) {
+  throw new Error(`Saved photo crop was not applied: ${croppedPhotoPosition}`);
+}
+const selectedVideoPreview = desktop.locator('[data-media-key="d05"] video').first();
+await selectedVideoPreview.waitFor({ state: "attached" });
+await selectedVideoPreview.evaluate((video) => new Promise((resolve) => {
+  if (video.readyState >= 2) resolve();
+  else {
+    video.addEventListener("loadeddata", resolve, { once: true });
+    window.setTimeout(resolve, 3000);
+  }
+}));
+const selectedVideoState = await selectedVideoPreview.evaluate((video) => ({
+  currentTime: video.currentTime,
+  objectPosition: getComputedStyle(video).objectPosition
+}));
+if (Math.abs(selectedVideoState.currentTime - 1.2) > .35) {
+  throw new Error(`Selected video frame was not sought: ${selectedVideoState.currentTime}`);
+}
+if (!selectedVideoState.objectPosition.includes("68%") || !selectedVideoState.objectPosition.includes("34%")) {
+  throw new Error(`Saved video crop was not applied: ${selectedVideoState.objectPosition}`);
+}
+
 await shot(desktop, "02-book-full-desktop.png", { fullPage: true });
 
 for (const [id, name] of [
@@ -142,18 +168,106 @@ await expandedCard.scrollIntoViewIfNeeded();
 await studio.waitForTimeout(140);
 await shot(studio, "19-memory-studio-expanded-caption.png", { fullPage: false });
 
+const firstPhotoItem = populatedChapter.locator(".item").filter({ hasText: "PHOTO" }).first();
+await firstPhotoItem.locator(".item-preview").hover();
+await firstPhotoItem.locator("[data-crop]").click();
+await studio.locator("#crop-dialog").waitFor({ state: "visible" });
+await shot(studio, "20-studio-crop-editor.png", { fullPage: false });
+const cropStage = studio.locator("#crop-stage");
+const cropBox = await cropStage.boundingBox();
+if (!cropBox) throw new Error("Crop stage has no bounding box");
+await studio.mouse.move(cropBox.x + cropBox.width / 2, cropBox.y + cropBox.height / 2);
+await studio.mouse.down();
+await studio.mouse.move(cropBox.x + cropBox.width / 2 + 70, cropBox.y + cropBox.height / 2 - 45, { steps: 8 });
+await studio.mouse.up();
+const cropPositionText = await studio.locator("#crop-position").textContent();
+if (!cropPositionText || cropPositionText.includes("X 50% · Y 50%")) {
+  throw new Error("Dragging inside crop editor did not change crop position");
+}
+await studio.locator("#crop-save").click();
+await studio.locator("#crop-dialog").waitFor({ state: "hidden" });
+
+const videoItem = populatedChapter.locator(".item").filter({ hasText: "VIDEO" }).first();
+await videoItem.locator(".item-preview").hover();
+await videoItem.locator("[data-crop]").click();
+await studio.locator("#open-frame-picker").click();
+await studio.locator("#frame-view").waitFor({ state: "visible" });
+await studio.locator("#frame-video").evaluate((video) => new Promise((resolve) => {
+  if (video.readyState >= 1) resolve();
+  else video.addEventListener("loadedmetadata", resolve, { once: true });
+}));
+await studio.locator("#frame-range").evaluate((range) => {
+  range.value = "2.1";
+  range.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await studio.waitForTimeout(180);
+await shot(studio, "21-studio-video-frame-picker.png", { fullPage: false });
+await studio.locator("#frame-save").click();
+await studio.locator("#crop-view").waitFor({ state: "visible" });
+const cropVideo = studio.locator("#crop-stage video");
+await cropVideo.waitFor({ state: "attached" });
+await cropVideo.evaluate((video) => new Promise((resolve) => {
+  if (video.readyState >= 2 && Math.abs(video.currentTime - 2.1) < .4) resolve();
+  else {
+    video.addEventListener("seeked", resolve, { once: true });
+    window.setTimeout(resolve, 3000);
+  }
+}));
+const cropVideoTime = await cropVideo.evaluate((video) => video.currentTime);
+if (Math.abs(cropVideoTime - 2.1) > .4) {
+  throw new Error(`Saved frame did not return to crop editor: ${cropVideoTime}`);
+}
+await shot(studio, "22-studio-video-frame-in-polaroid.png", { fullPage: false });
+
+await studio.locator("#open-frame-picker").click();
+await studio.locator("#frame-video").evaluate((video) => new Promise((resolve) => {
+  if (video.readyState >= 1) resolve();
+  else video.addEventListener("loadedmetadata", resolve, { once: true });
+}));
+await studio.locator("#frame-range").evaluate((range) => {
+  range.value = "3.1";
+  range.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await studio.locator("#frame-cancel").click();
+await studio.locator("#open-frame-picker").click();
+await studio.locator("#frame-video").evaluate((video) => new Promise((resolve) => {
+  if (video.readyState >= 1) resolve();
+  else video.addEventListener("loadedmetadata", resolve, { once: true });
+}));
+const restoredFrameTime = await studio.locator("#frame-video").evaluate((video) => video.currentTime);
+if (Math.abs(restoredFrameTime - 2.1) > .4) {
+  throw new Error(`Frame picker cancel did not restore previous frame: ${restoredFrameTime}`);
+}
+await studio.locator("#frame-range").evaluate((range) => {
+  range.value = "2.6";
+  range.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await studio.locator("#frame-save-exit").click();
+await studio.locator("#crop-dialog").waitFor({ state: "hidden" });
+
+const exported = studio.waitForEvent("download");
+await studio.locator("#export").click();
+const download = await exported;
+const exportPath = path.join(output, "studio-export-test.js");
+await download.saveAs(exportPath);
+const exportedText = await fs.readFile(exportPath, "utf8");
+if (!exportedText.includes('"crop"') || !exportedText.includes('"posterTime": 2.6')) {
+  throw new Error("Studio export does not contain crop and selected video frame settings");
+}
+await fs.rm(exportPath, { force: true });
+
 const singleEvent = desktop.locator("#ordinary-days .memory-block--event").first();
 await singleEvent.scrollIntoViewIfNeeded();
 await desktop.waitForTimeout(120);
-await singleEvent.screenshot({ path: path.join(output, "20-single-row-event.png"), animations: "disabled" });
+await singleEvent.screenshot({ path: path.join(output, "23-single-row-event.png"), animations: "disabled" });
 const eightEvent = desktop.locator("#journeys .memory-block--event").first();
 await eightEvent.scrollIntoViewIfNeeded();
 await desktop.waitForTimeout(120);
-await eightEvent.screenshot({ path: path.join(output, "21-eight-item-event.png"), animations: "disabled" });
+await eightEvent.screenshot({ path: path.join(output, "24-eight-item-event.png"), animations: "disabled" });
 const rightmostItem = eightEvent.locator(".event-preview__item--8");
 await rightmostItem.hover();
 await desktop.waitForTimeout(120);
-await eightEvent.screenshot({ path: path.join(output, "22-eight-item-hover-layer.png"), animations: "disabled" });
+await eightEvent.screenshot({ path: path.join(output, "25-eight-item-hover-layer.png"), animations: "disabled" });
 
 await browser.close();
 
