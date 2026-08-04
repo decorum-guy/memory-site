@@ -82,15 +82,26 @@ await selectedVideoPreview.evaluate((video, expected) => new Promise((resolve, r
   };
 
   const nudgeDecode = async () => {
-    if (nudging || video.readyState < 1 || settled) return;
+    if (nudging || settled) return;
     nudging = true;
     video.muted = true;
-    try { await video.play(); } catch {}
-    try {
-      if (typeof video.fastSeek === "function") video.fastSeek(expected);
-      else video.currentTime = expected;
-    } catch {}
-    window.setTimeout(() => { nudging = false; }, 300);
+    video.preload = "auto";
+
+    const seekFrame = async () => {
+      try { await video.play(); } catch {}
+      try {
+        if (typeof video.fastSeek === "function") video.fastSeek(expected);
+        else video.currentTime = expected;
+      } catch {}
+    };
+
+    if (video.readyState >= 1) {
+      await seekFrame();
+    } else {
+      video.addEventListener("loadedmetadata", () => { void seekFrame(); }, { once: true });
+      try { video.load(); } catch {}
+    }
+    window.setTimeout(() => { nudging = false; }, 1200);
   };
 
   const check = () => {
