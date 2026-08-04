@@ -58,26 +58,35 @@ await sharedAlbum.scrollIntoViewIfNeeded();
 await desktop.waitForTimeout(180);
 await sharedAlbum.screenshot({ path: path.join(output, "08-shared-album.png"), animations: "disabled" });
 
-const censoredFrame = desktop.locator(".image-frame.is-censored").first();
-await censoredFrame.scrollIntoViewIfNeeded();
-await censoredFrame.evaluate((element) => element.closest("button")?.click());
-await desktop.locator("#lightbox-censor").waitFor({ state: "visible" });
-await shot(desktop, "09-censorship-warning.png", { fullPage: false });
-await desktop.locator("#lightbox-censor-show").click();
-await desktop.waitForTimeout(120);
-await shot(desktop, "10-censorship-revealed.png", { fullPage: false });
-await desktop.locator("#lightbox-close").click();
-await censoredFrame.scrollIntoViewIfNeeded();
-await desktop.waitForTimeout(100);
-await shot(desktop, "11-local-censorship-stays-revealed.png", { fullPage: false });
+// Censorship checks run in their own page so sessionStorage and local reveal state cannot leak.
+const censorPage = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
+await censorPage.goto(`${base}/${previewQuery}`, { waitUntil: "networkidle" });
+await settle(censorPage);
+await censorPage.locator("#open-book").click();
+const censoredCover = censorPage.locator("#ordinary-days .censor-preview").first();
+await censoredCover.waitFor({ state: "visible" });
+await censoredCover.evaluate((element) => element.closest("button")?.click());
+await censorPage.locator("#lightbox-censor").waitFor({ state: "visible" });
+await shot(censorPage, "09-censorship-warning.png", { fullPage: false });
+await censorPage.locator("#lightbox-censor-show").click();
+await censorPage.waitForTimeout(120);
+await shot(censorPage, "10-censorship-revealed.png", { fullPage: false });
+await censorPage.locator("#lightbox-close").click();
+await censorPage.locator("#ordinary-days").scrollIntoViewIfNeeded();
+await censorPage.waitForTimeout(120);
+if (await censorPage.locator("#ordinary-days .censor-preview").count()) {
+  throw new Error("Locally revealed censored card became hidden again after closing the lightbox");
+}
+await shot(censorPage, "11-local-censorship-stays-revealed.png", { fullPage: false });
 
-const censorshipButton = desktop.locator(".reader-tools__button--censor");
+const censorshipButton = censorPage.locator(".reader-tools__button--censor");
 await censorshipButton.click();
-await desktop.waitForLoadState("networkidle");
-await desktop.locator("#open-book").click();
-await desktop.locator("#ordinary-days").scrollIntoViewIfNeeded();
-await desktop.waitForTimeout(250);
-await shot(desktop, "12-global-censorship-off.png", { fullPage: false });
+await censorPage.waitForLoadState("networkidle");
+await censorPage.locator("#open-book").click();
+await censorPage.locator("#ordinary-days").scrollIntoViewIfNeeded();
+await censorPage.waitForTimeout(250);
+await shot(censorPage, "12-global-censorship-off.png", { fullPage: false });
+await censorPage.close();
 
 // Regression for applying memories.js and reopening while the browser restores a deep scroll position.
 const chromeCheck = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
@@ -90,7 +99,9 @@ await chromeCheck.waitForTimeout(220);
 const readerChromeRestored = await chromeCheck.evaluate(() => {
   const rail = document.querySelector("#chapter-rail");
   const tools = document.querySelector(".reader-tools");
-  return document.body.classList.contains("book-opened") && Boolean(rail) && Boolean(tools);
+  const railVisible = rail && getComputedStyle(rail).opacity !== "0";
+  const toolsVisible = tools && getComputedStyle(tools).opacity !== "0";
+  return document.body.classList.contains("book-opened") && Boolean(railVisible) && Boolean(toolsVisible);
 });
 if (!readerChromeRestored) throw new Error("Reader chrome was not restored after a deep reload");
 await shot(chromeCheck, "13-reader-chrome-after-deep-reload.png", { fullPage: false });
@@ -119,6 +130,9 @@ const populatedChapter = studio.locator("details.chapter").nth(1);
 await populatedChapter.evaluate((element) => { element.open = true; });
 await populatedChapter.scrollIntoViewIfNeeded();
 await studio.waitForTimeout(350);
+if (await studio.locator(".item-preview.is-missing").count()) {
+  throw new Error("Memory Studio contains broken photo or video previews");
+}
 await shot(studio, "18-memory-studio.png", { fullPage: false });
 const expandButton = studio.locator("[data-expand]").first();
 await expandButton.click();
