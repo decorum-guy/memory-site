@@ -1,9 +1,9 @@
 # Design Preview Status
 
-- Commit: `08ec4f8d1d86fcdd70bb484fd9e9b32ea3f5f6cd`
-- Run: https://github.com/decorum-guy/memory-site/actions/runs/30868686353
-- Generated: 2026-08-04 01:26:16 UTC
-- Result: **skipped**
+- Commit: `2db73cdcfba45e4434ccacb25cbe83f42f9bc612`
+- Run: https://github.com/decorum-guy/memory-site/actions/runs/30868935127
+- Generated: 2026-08-04 01:36:03 UTC
+- Result: **cancelled**
 
 ## Последние строки ошибки
 ```text
