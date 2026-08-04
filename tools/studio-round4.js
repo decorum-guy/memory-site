@@ -1,4 +1,6 @@
 (function () {
+  installStudioTabs();
+
   const baseNormalizeBook = normalizeBook;
   normalizeBook = function round4NormalizeBook() {
     baseNormalizeBook();
@@ -40,6 +42,18 @@
     baseRender();
     renderBookSettings();
   };
+
+  function installStudioTabs() {
+    const top = document.querySelector(".top");
+    if (!top || top.querySelector(".studio-tabs")) return;
+    const tabs = document.createElement("nav");
+    tabs.className = "studio-tabs";
+    tabs.setAttribute("aria-label", "Разделы конструктора");
+    tabs.innerHTML = `
+      <a class="is-active" href="studio.html" aria-current="page">Memory Studio</a>
+      <a href="telegram_studio.html">Telegram Studio</a>`;
+    top.prepend(tabs);
+  }
 
   function renderBookSettings() {
     let panel = document.getElementById("book-settings");
