@@ -1,10 +1,9 @@
 name: Stabilize selected video frame verification
 
 on:
-  push:
-    branches: [review-round-2-polish]
-    paths:
-      - ".github/workflows/stabilize-video-frame-ci.yml"
+  pull_request:
+    branches: [main]
+    types: [reopened]
 
 permissions:
   contents: write
