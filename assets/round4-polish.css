@@ -13,23 +13,37 @@
   letter-spacing: -.02em;
 }
 
+.reader-tools__button--censor {
+  align-items: center;
+  line-height: 1;
+}
 .reader-tools__icon {
   position: relative;
   width: 1.18rem;
   height: 1.18rem;
   flex: 0 0 1.18rem;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  box-sizing: border-box;
+  margin: 0;
   border: 2px solid currentColor;
   border-radius: 50%;
+  font-size: 0 !important;
+  line-height: 0;
 }
 .reader-tools__icon i {
+  display: block;
+  flex: 0 0 auto;
   width: .48rem;
   height: .48rem;
+  margin: 0;
   border-radius: 50%;
   background: currentColor;
   opacity: 0;
   transform: scale(.35);
+  transform-origin: 50% 50%;
   transition: opacity .18s ease, transform .18s ease;
 }
 .reader-tools__button--censor[aria-pressed="true"] .reader-tools__icon i {
