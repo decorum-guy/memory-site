@@ -230,7 +230,7 @@ await mobile.locator("#open-book").click();
 await mobile.locator("#ordinary-days").scrollIntoViewIfNeeded();
 await mobile.waitForTimeout(220);
 await shot(mobile, "15-event-mobile.png", { fullPage: false });
-const telegramMobile = mobile.locator("#telegram .memory-block--collage").first();
+const telegramMobile = mobile.locator("#telegram .telegram-message").first();
 await telegramMobile.scrollIntoViewIfNeeded();
 await mobile.waitForTimeout(180);
 await telegramMobile.screenshot({ path: path.join(output, "16-telegram-mobile.png"), animations: "disabled" });

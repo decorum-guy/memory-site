@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-08-04T07:10:01.113Z",
+  "files": [
+    "01-cover-desktop.png",
+    "02-book-full-desktop.png",
+    "03-chapter-beginning.png",
+    "04-chapter-events.png",
+    "05-chapter-stack.png",
+    "06-chapter-telegram.png",
+    "07-chapter-ending.png",
+    "08-shared-album.png",
+    "09-censorship-warning.png",
+    "10-censorship-revealed.png",
+    "11-local-censorship-stays-revealed.png",
+    "12-global-censorship-off.png",
+    "13-reader-chrome-after-deep-reload.png",
+    "14-cover-mobile.png",
+    "15-event-mobile.png",
+    "16-telegram-mobile.png",
+    "17-shared-album-mobile.png",
+    "18-memory-studio.png",
+    "19-memory-studio-expanded-caption.png",
+    "20-studio-crop-editor.png",
+    "21-studio-video-frame-picker.png",
+    "22-studio-video-frame-in-polaroid.png",
+    "23-single-row-event.png",
+    "24-eight-item-event.png",
+    "25-eight-item-hover-layer.png"
+  ]
+}
