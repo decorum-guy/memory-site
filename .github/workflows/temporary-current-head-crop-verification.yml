@@ -29,6 +29,10 @@ jobs:
           python -m pip install --disable-pip-version-check Pillow qrcode
           python preview/generate_demo_media.py
           python preview/generate_extra_media.py
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
           ffmpeg -hide_banner -loglevel error -y \
             -loop 1 -i preview/demo-media/video-poster.jpg \
             -vf "scale=1280:-2,zoompan=z='min(zoom+0.0008,1.08)':d=120:s=1280x854:fps=30" \
