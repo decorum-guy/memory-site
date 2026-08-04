@@ -7,6 +7,11 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function shapeNumber(text) {
+  const match = String(text || "").match(/форма\s+(\d+)/i);
+  return match ? Number(match[1]) - 1 : null;
+}
+
 try {
   const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
   page.setDefaultTimeout(20000);
@@ -16,7 +21,11 @@ try {
   await page.locator("#add-note").click();
   const note = page.locator(".block").last();
   await note.locator("textarea").fill("Моя тестовая записка для Сони.");
+  const initialShape = shapeNumber(await note.locator(".note-preview").textContent());
   await note.locator("[data-shape]").click();
+  const changedShape = shapeNumber(await page.locator(".block").first().locator(".note-preview").textContent());
+  assert(Number.isInteger(initialShape) && Number.isInteger(changedShape), "Could not read torn-paper shape numbers");
+  assert(changedShape !== initialShape, `Shape control did not change the edge: ${initialShape} -> ${changedShape}`);
 
   await page.locator("#add-quote").click();
   const quote = page.locator(".block").last();
@@ -40,7 +49,7 @@ try {
   });
   assert(state.blocks.length === 2, `Unexpected saved block count: ${JSON.stringify(state)}`);
   assert(state.blocks[0].type === "note", `First block is not a note: ${JSON.stringify(state.blocks[0])}`);
-  assert(state.blocks[0].shape === 1, `Shape control did not persist: ${JSON.stringify(state.blocks[0])}`);
+  assert(state.blocks[0].shape === changedShape, `Shape control did not persist: expected ${changedShape}, got ${JSON.stringify(state.blocks[0])}`);
   assert(state.blocks[1].type === "quote" && state.blocks[1].speaker === "me", `Speaker did not persist: ${JSON.stringify(state.blocks[1])}`);
   assert(Boolean(state.blocks[1].screenshot), `Optional screenshot did not persist: ${JSON.stringify(state.blocks[1])}`);
 
@@ -53,6 +62,8 @@ try {
   assert(generated.includes('"screenshot": "media/telegram/'), "Generated chapter has no optional screenshot");
 
   console.log(JSON.stringify({
+    initialShape,
+    changedShape,
     blocks: state.blocks.map(({ type, speaker, shape, screenshot }) => ({ type, speaker, shape, screenshot: Boolean(screenshot) })),
     generated: "ok",
   }, null, 2));
