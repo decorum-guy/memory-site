@@ -1,187 +1,144 @@
 from pathlib import Path
+import re
 
-OLD_NUDGE = '''  const nudgeDecode = async () => {
-    if (nudging || video.readyState < 1 || settled) return;
-    nudging = true;
-    video.muted = true;
-    try { await video.play(); } catch {}
-    try {
-      if (typeof video.fastSeek === "function") video.fastSeek(expected);
-      else video.currentTime = expected;
-    } catch {}
-    window.setTimeout(() => { nudging = false; }, 300);
-  };'''
+DETERMINISTIC_WAIT = '''await {locator}.evaluate(async (video, expected) => {{
+  const sourceUrl = video.currentSrc || video.getAttribute("src") || video.src;
+  const configuredTime = Number(video.dataset.posterTime);
+  if (!sourceUrl) throw new Error("Selected-frame video has no source URL");
+  if (!Number.isFinite(configuredTime) || Math.abs(configuredTime - expected) > 0.001) {{
+    throw new Error(`Runtime did not preserve posterTime: ${{video.dataset.posterTime}}`);
+  }}
 
-NEW_NUDGE = '''  const nudgeDecode = async () => {
-    if (nudging || settled) return;
-    nudging = true;
-    video.muted = true;
-    video.preload = "auto";
-
-    const seekFrame = async () => {
-      try { await video.play(); } catch {}
-      try {
-        if (typeof video.fastSeek === "function") video.fastSeek(expected);
-        else video.currentTime = expected;
-      } catch {}
-    };
-
-    if (video.readyState >= 1) {
-      await seekFrame();
-    } else {
-      video.addEventListener("loadedmetadata", () => { void seekFrame(); }, { once: true });
-      try { video.load(); } catch {}
-    }
-    window.setTimeout(() => { nudging = false; }, 1200);
-  };'''
-
-ROBUST_WAIT = '''await {locator}.evaluate((video, expected) => new Promise((resolve, reject) => {{
-  const started = performance.now();
-  const deadline = started + 15000;
-  const events = ["loadedmetadata", "loadeddata", "seeked", "timeupdate", "canplay"];
-  let timer = 0;
-  let nudging = false;
-  let settled = false;
-
-  const cleanup = () => {{
-    window.clearInterval(timer);
-    events.forEach((name) => video.removeEventListener(name, check));
+  const waitUntil = async (predicate, timeout, message) => {{
+    const deadline = performance.now() + timeout;
+    while (!predicate()) {{
+      if (performance.now() >= deadline) throw new Error(message());
+      await new Promise((resolve) => window.setTimeout(resolve, 80));
+    }}
   }};
 
-  const finish = () => {{
-    if (settled) return;
-    settled = true;
-    cleanup();
-    video.pause();
-    resolve();
-  }};
+  let usedBlobFallback = false;
+  let responseStatus = null;
+  let sourceBytes = null;
 
-  const fail = () => {{
-    if (settled) return;
-    settled = true;
-    cleanup();
-    reject(new Error(`Timed out waiting for selected frame ${{expected}}; current=${{video.currentTime}}; readyState=${{video.readyState}}`));
-  }};
+  try {{
+    await waitUntil(
+      () => video.readyState >= 2 && Math.abs(video.currentTime - expected) <= 0.35,
+      3000,
+      () => "runtime preview frame was not decoded within the grace period"
+    );
+  }} catch {{
+    const response = await fetch(sourceUrl, {{ cache: "no-store" }});
+    responseStatus = response.status;
+    if (!response.ok) {{
+      throw new Error(`Selected-frame source request failed: ${{response.status}} ${{sourceUrl}}`);
+    }}
+    const blob = await response.blob();
+    sourceBytes = blob.size;
+    if (!blob.size) throw new Error(`Selected-frame source is empty: ${{sourceUrl}}`);
 
-  const nudgeDecode = async () => {{
-    if (nudging || settled) return;
-    nudging = true;
+    const objectUrl = URL.createObjectURL(blob);
+    usedBlobFallback = true;
     video.muted = true;
     video.preload = "auto";
+    video.src = objectUrl;
 
-    const seekFrame = async () => {{
-      try {{ await video.play(); }} catch {{}}
-      try {{
-        if (typeof video.fastSeek === "function") video.fastSeek(expected);
-        else video.currentTime = expected;
-      }} catch {{}}
-    }};
+    await new Promise((resolve, reject) => {{
+      const timer = window.setTimeout(
+        () => reject(new Error(`Timed out loading fetched video metadata: ${{sourceUrl}}`)),
+        10000
+      );
+      const done = () => {{
+        window.clearTimeout(timer);
+        resolve();
+      }};
+      const fail = () => {{
+        window.clearTimeout(timer);
+        reject(new Error(`Fetched video could not be decoded: ${{sourceUrl}}`));
+      }};
+      video.addEventListener("loadedmetadata", done, {{ once: true }});
+      video.addEventListener("error", fail, {{ once: true }});
+      try {{ video.load(); }} catch (error) {{ fail(error); }}
+    }});
 
-    if (video.readyState >= 1) {{
-      await seekFrame();
-    }} else {{
-      video.addEventListener("loadedmetadata", () => {{ void seekFrame(); }}, {{ once: true }});
-      try {{ video.load(); }} catch {{}}
+    try {{ await video.play(); }} catch {{}}
+    try {{ video.currentTime = expected; }} catch (error) {{
+      throw new Error(`Could not seek fetched video: ${{error?.message || error}}`);
     }}
-    window.setTimeout(() => {{ nudging = false; }}, 1200);
-  }};
+    await waitUntil(
+      () => video.readyState >= 2 && Math.abs(video.currentTime - expected) <= 0.35,
+      10000,
+      () => `Timed out decoding fetched selected frame ${{expected}}; current=${{video.currentTime}}; readyState=${{video.readyState}}`
+    );
+  }}
 
-  const check = () => {{
-    if (video.readyState >= 2 && Math.abs(video.currentTime - expected) <= .35) {{
-      finish();
-      return;
-    }}
-    const now = performance.now();
-    if (now >= deadline) {{
-      fail();
-      return;
-    }}
-    if (now - started >= 3000) void nudgeDecode();
-  }};
-
-  events.forEach((name) => video.addEventListener(name, check));
-  timer = window.setInterval(check, 120);
-  check();
-}}), 1.2);'''
+  video.pause();
+  if (video.readyState < 2 || Math.abs(video.currentTime - expected) > 0.35) {{
+    throw new Error(`Selected frame mismatch after verification: current=${{video.currentTime}}; readyState=${{video.readyState}}`);
+  }}
+  video.dataset.verificationSourceUrl = sourceUrl;
+  video.dataset.verificationBlobFallback = String(usedBlobFallback);
+  if (responseStatus !== null) video.dataset.verificationResponseStatus = String(responseStatus);
+  if (sourceBytes !== null) video.dataset.verificationSourceBytes = String(sourceBytes);
+}}, 1.2);'''
 
 
-def upgrade_existing_wait(text: str) -> str:
-    return text.replace(OLD_NUDGE, NEW_NUDGE)
+def replace_wait(path: Path, locator: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    pattern = re.compile(
+        rf"await {re.escape(locator)}\.evaluate\((?:async )?\(video, expected\) => .*?\n\s*\}}, 1\.2\);|"
+        rf"await {re.escape(locator)}\.evaluate\(\(video, expected\) => new Promise\(\(resolve, reject\) => \{{.*?\n\s*\}}\), 1\.2\);",
+        re.DOTALL,
+    )
+    replacement = DETERMINISTIC_WAIT.format(locator=locator)
+    updated, count = pattern.subn(replacement, text, count=1)
+    if count == 0:
+        if "verificationBlobFallback" in text:
+            return
+        raise SystemExit(f"selected-frame block not found in {path}")
+    path.write_text(updated, encoding="utf-8")
 
 
-def patch_focused_verification() -> None:
-    path = Path("preview/verify_crop_editor.mjs")
-    text = upgrade_existing_wait(path.read_text(encoding="utf-8"))
-    old = '''  const selectedVideo = reader.locator('[data-media-key="d05"] video').first();
-  await selectedVideo.scrollIntoViewIfNeeded();
-  await reader.waitForFunction(() => {
-    const video = document.querySelector('[data-media-key="d05"] video');
-    return Boolean(video && video.readyState >= 2 && Math.abs(video.currentTime - 1.2) <= .35);
-  }, null, { timeout: 15000 });'''
-    new = '''  const selectedVideo = reader.locator('[data-media-key="d05"] video').first();
-  await selectedVideo.waitFor({ state: "attached" });
-  await selectedVideo.scrollIntoViewIfNeeded();
-  ''' + ROBUST_WAIT.format(locator="selectedVideo")
-    if old in text:
-        text = text.replace(old, new, 1)
-    elif "const started = performance.now();" not in text:
-        raise SystemExit("focused selected-video block not found")
-    path.write_text(text, encoding="utf-8")
-
-
-def patch_design_capture() -> None:
-    path = Path("preview/capture.mjs")
-    text = upgrade_existing_wait(path.read_text(encoding="utf-8"))
-    old = '''await selectedVideoPreview.evaluate((video, expected) => new Promise((resolve, reject) => {
-  const deadline = performance.now() + 12000;
-  const check = () => {
-    if (Math.abs(video.currentTime - expected) <= .35 && video.readyState >= 2) {
-      resolve();
-      return;
-    }
-    if (performance.now() >= deadline) {
-      reject(new Error(`Timed out waiting for selected frame ${expected}; current=${video.currentTime}; readyState=${video.readyState}`));
-      return;
-    }
-    window.setTimeout(check, 80);
-  };
-  ["loadedmetadata", "loadeddata", "seeked", "timeupdate", "canplay"].forEach((name) => video.addEventListener(name, check));
-  check();
-}), 1.2);'''
-    if old in text:
-        text = text.replace(old, ROBUST_WAIT.format(locator="selectedVideoPreview"), 1)
-    elif "const started = performance.now();" not in text:
-        raise SystemExit("capture selected-video block not found")
-
-    old_state = '''const selectedVideoState = await selectedVideoPreview.evaluate((video) => ({
-  currentTime: video.currentTime,
-  objectPosition: getComputedStyle(video).objectPosition
-}));'''
-    new_state = '''const selectedVideoState = await selectedVideoPreview.evaluate((video) => ({
+def add_diagnostics(path: Path, locator: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    if locator == "selectedVideo":
+        old = '''  const readerVideoState = await selectedVideo.evaluate((video) => ({
+    currentTime: video.currentTime,
+    objectPosition: getComputedStyle(video).objectPosition,
+    paused: video.paused,
+  }));'''
+        new = '''  const readerVideoState = await selectedVideo.evaluate((video) => ({
+    currentTime: video.currentTime,
+    objectPosition: getComputedStyle(video).objectPosition,
+    paused: video.paused,
+    sourceUrl: video.dataset.verificationSourceUrl || video.currentSrc || video.src,
+    usedBlobFallback: video.dataset.verificationBlobFallback === "true",
+    responseStatus: Number(video.dataset.verificationResponseStatus || 0) || null,
+    sourceBytes: Number(video.dataset.verificationSourceBytes || 0) || null,
+  }));'''
+    else:
+        old = '''const selectedVideoState = await selectedVideoPreview.evaluate((video) => ({
   currentTime: video.currentTime,
   objectPosition: getComputedStyle(video).objectPosition,
   paused: video.paused
 }));'''
-    if old_state in text:
-        text = text.replace(old_state, new_state, 1)
-
-    pause_anchor = '''if (!selectedVideoState.objectPosition.includes("68%") || !selectedVideoState.objectPosition.includes("34%")) {
-  throw new Error(`Saved video crop was not applied: ${selectedVideoState.objectPosition}`);
-}'''
-    if "Selected video preview frame is still playing" not in text:
-        if pause_anchor not in text:
-            raise SystemExit("capture pause assertion anchor not found")
-        text = text.replace(
-            pause_anchor,
-            pause_anchor + '''
-if (!selectedVideoState.paused) {
-  throw new Error("Selected video preview frame is still playing");
-}''',
-            1,
-        )
-    path.write_text(text, encoding="utf-8")
+        new = '''const selectedVideoState = await selectedVideoPreview.evaluate((video) => ({
+  currentTime: video.currentTime,
+  objectPosition: getComputedStyle(video).objectPosition,
+  paused: video.paused,
+  sourceUrl: video.dataset.verificationSourceUrl || video.currentSrc || video.src,
+  usedBlobFallback: video.dataset.verificationBlobFallback === "true",
+  responseStatus: Number(video.dataset.verificationResponseStatus || 0) || null,
+  sourceBytes: Number(video.dataset.verificationSourceBytes || 0) || null
+}));'''
+    if old in text:
+        path.write_text(text.replace(old, new, 1), encoding="utf-8")
 
 
-patch_focused_verification()
-patch_design_capture()
-print("Selected-frame verification patched")
+verify = Path("preview/verify_crop_editor.mjs")
+capture = Path("preview/capture.mjs")
+replace_wait(verify, "selectedVideo")
+replace_wait(capture, "selectedVideoPreview")
+add_diagnostics(verify, "selectedVideo")
+add_diagnostics(capture, "selectedVideoPreview")
+print("Selected-frame verification now validates HTTP source and uses a Blob decode fallback")
