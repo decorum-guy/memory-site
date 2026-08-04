@@ -1,0 +1,16 @@
+@media (hover: hover) and (pointer: fine) {
+  html,
+  body,
+  body * {
+    cursor:
+      url("./cursors/scrapbook-pencil-final-v19.svg") 2 30,
+      url("./cursors/scrapbook-pencil-final-v19.png") 2 30,
+      auto;
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"] {
+    cursor: text;
+  }
+}
