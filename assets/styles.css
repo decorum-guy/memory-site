@@ -92,7 +92,7 @@ img, video { max-width: 100%; display: block; }
   max-width: 10ch;
   margin: 0;
   font: 400 clamp(4rem, 11vw, 8.2rem)/.83 var(--serif);
-  letter-spacing: -.065em;
+  letter-spacing: -.018em;
   text-wrap: balance;
   text-shadow: 0 2px 0 rgba(31,16,12,.4);
 }
@@ -110,19 +110,19 @@ img, video { max-width: 100%; display: block; }
   line-height: 1.65;
 }
 .cover__seal {
-  width: 3.8rem;
-  height: 3.8rem;
+  width: 7.8rem;
+  height: 7.8rem;
   margin-top: 2.5rem;
   display: grid;
   place-items: center;
   border-radius: 50%;
   color: #6c261f;
   background: #b6544b;
-  border: .38rem double #8a342e;
+  border: .58rem double #8a342e;
   transform: rotate(-8deg);
   box-shadow: .25rem .5rem .8rem rgba(18,7,5,.27), inset .15rem .2rem .4rem rgba(255,255,255,.2);
 }
-.cover__seal span { transform: translateY(-1px); }
+.cover__seal span { font-size: 3.15rem; transform: translateY(-2px); }
 .open-book {
   border: 0;
   display: inline-flex;

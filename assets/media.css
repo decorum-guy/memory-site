@@ -287,3 +287,36 @@
 .event-preview__item:hover .image-frame > video,
 .event-preview__item:focus-visible .image-frame > video { transform: scale(1.035); }
 .image-frame.is-censored > video { transform: scale(1.16); }
+
+/* Round 3: Live Photo controls live below metadata instead of covering it. */
+.lightbox__figure {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, auto) auto auto;
+  row-gap: .5rem;
+}
+.lightbox__image,
+.lightbox__video {
+  grid-column: 1;
+  grid-row: 1;
+  max-height: 68vh;
+}
+.lightbox__caption {
+  grid-column: 1;
+  grid-row: 2;
+  margin-top: .2rem;
+}
+.lightbox__live {
+  position: static;
+  grid-column: 1;
+  grid-row: 3;
+  justify-self: center;
+  left: auto;
+  bottom: auto;
+  margin: .15rem 0 0;
+  transform: none;
+}
+@media (max-width: 600px) {
+  .lightbox__image,
+  .lightbox__video { max-height: 61vh; }
+}
+
