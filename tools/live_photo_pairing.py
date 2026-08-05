@@ -2,9 +2,11 @@
 """Strict Live Photo pairing shared by import and preflight.
 
 A matching filename is only a last-resort signal. Exact Apple
-ContentIdentifier matches are preferred. Filename fallback is allowed only for
-one image + one video in the same folder, with no identifiers on either side
-and a close timestamp. Ambiguous groups stay as independent media.
+ContentIdentifier matches are preferred only for unambiguous files. Filename
+fallback is allowed only for one image + one video in the same folder, with no
+identifiers on either side and a close timestamp. Any same-stem group with
+multiple images or multiple videos remains fully independent so no source file
+can disappear from the book.
 """
 from __future__ import annotations
 
@@ -25,6 +27,20 @@ def _time_distance(left: Any, right: Any) -> float:
     return abs((left.taken_at - right.taken_at).total_seconds())
 
 
+def ambiguous_stem_keys(
+    images_by_stem: dict[tuple[str, str], list[Any]],
+    videos_by_stem: dict[tuple[str, str], list[Any]],
+) -> set[tuple[str, str]]:
+    keys = set(images_by_stem) | set(videos_by_stem)
+    return {
+        key
+        for key in keys
+        if images_by_stem.get(key)
+        and videos_by_stem.get(key)
+        and (len(images_by_stem[key]) != 1 or len(videos_by_stem[key]) != 1)
+    }
+
+
 def pair_live_photos_strict(media: list[Any]) -> tuple[list[Any], set[Path]]:
     """Pair only confident Live Photos and preserve every ambiguous file."""
     images = [item for item in media if item.is_image]
@@ -42,14 +58,18 @@ def pair_live_photos_strict(media: list[Any]) -> tuple[list[Any], set[Path]]:
             videos_by_id[str(video.content_id)].append(video)
         videos_by_stem[stem_key(video.source)].append(video)
 
-    # Strong signal: Apple ContentIdentifier must match exactly.
+    ambiguous = ambiguous_stem_keys(images_by_stem, videos_by_stem)
+
+    # Strong signal: Apple ContentIdentifier must match exactly, but even an
+    # identifier cannot collapse an ambiguous IMG_1234.JPG/HEIC/MOV group.
     for image in images:
-        if not image.content_id:
+        if not image.content_id or stem_key(image.source) in ambiguous:
             continue
         candidates = [
             candidate
             for candidate in videos_by_id.get(str(image.content_id), [])
             if candidate.source not in used_videos
+            and stem_key(candidate.source) not in ambiguous
         ]
         if not candidates:
             continue
@@ -59,6 +79,8 @@ def pair_live_photos_strict(media: list[Any]) -> tuple[list[Any], set[Path]]:
 
     # Weak signal: same folder + same stem is accepted only when unambiguous.
     for key, image_group in images_by_stem.items():
+        if key in ambiguous:
+            continue
         video_group = videos_by_stem.get(key, [])
         if len(image_group) != 1 or len(video_group) != 1:
             continue
@@ -134,14 +156,19 @@ def estimate_live_pairs_strict(
             videos_by_id[content_id].append(video)
         videos_by_stem[stem_key(video)].append(video)
 
+    ambiguous = ambiguous_stem_keys(images_by_stem, videos_by_stem)
     used: set[Path] = set()
     paired_images: set[Path] = set()
 
     for image in images:
         content_id, image_time = image_info[image]
-        if not content_id:
+        if not content_id or stem_key(image) in ambiguous:
             continue
-        candidates = [path for path in videos_by_id.get(content_id, []) if path not in used]
+        candidates = [
+            path
+            for path in videos_by_id.get(content_id, [])
+            if path not in used and stem_key(path) not in ambiguous
+        ]
         if not candidates:
             continue
         best = min(candidates, key=lambda path: abs((video_info[path][1] - image_time).total_seconds()))
@@ -149,6 +176,8 @@ def estimate_live_pairs_strict(
         paired_images.add(image)
 
     for key, image_group in images_by_stem.items():
+        if key in ambiguous:
+            continue
         video_group = videos_by_stem.get(key, [])
         if len(image_group) != 1 or len(video_group) != 1:
             continue
