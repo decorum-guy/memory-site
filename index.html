@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="assets/shared-and-telegram.css" />
   <link rel="stylesheet" href="assets/cursor-scrapbook-pencil-final-v19.css" />
   <link rel="stylesheet" href="assets/round4-polish.css" />
+  <link rel="stylesheet" href="assets/location-overlay.css" />
 </head>
 <body>
   <div class="ambient-grain" aria-hidden="true"></div>
@@ -45,6 +46,7 @@
     <button class="lightbox__close" id="lightbox-close" type="button" aria-label="Закрыть">×</button>
     <button class="lightbox__nav lightbox__nav--prev" id="lightbox-prev" type="button" aria-label="Предыдущий файл">‹</button>
     <figure class="lightbox__figure">
+      <div class="lightbox__location" id="lightbox-location" aria-live="polite" hidden></div>
       <img class="lightbox__image" id="lightbox-image" alt="" />
       <video class="lightbox__video" id="lightbox-video" playsinline preload="metadata" hidden></video>
       <div class="lightbox__live-controls">
@@ -77,5 +79,6 @@
   <script src="assets/app.js"></script>
   <script src="assets/telegram-enhancements.js"></script>
   <script src="assets/round4-polish.js"></script>
+  <script src="assets/location-overlay.js"></script>
 </body>
 </html>
