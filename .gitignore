@@ -6,6 +6,7 @@ Thumbs.db
 .memory-test/
 .memory-backups/
 .memory-tools/
+.memory-audit/
 .memory-location-cache.json
 import/
 ORIGINALS/
