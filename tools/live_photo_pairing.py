@@ -24,10 +24,12 @@ from typing import Any, Callable, Iterable
 
 FALLBACK_MAX_SECONDS = 120
 
+# Copy counters are deliberately limited to 2..999. This detects IMG_8271_2
+# but does not mistake the ordinary four-digit camera stem IMG_8271 for IMG.
 _COPY_SUFFIX_PATTERNS = (
     re.compile(r"^(?P<base>.+?)\s+\((?P<number>\d+)\)$", re.IGNORECASE),
-    re.compile(r"^(?P<base>.+?)\s+(?P<number>[2-9]\d*)$", re.IGNORECASE),
-    re.compile(r"^(?P<base>.+?)[_-](?P<number>[2-9]\d*)$", re.IGNORECASE),
+    re.compile(r"^(?P<base>.+?)\s+(?P<number>[2-9]\d{0,2})$", re.IGNORECASE),
+    re.compile(r"^(?P<base>.+?)[_-](?P<number>[2-9]\d{0,2})$", re.IGNORECASE),
     re.compile(r"^(?P<base>.+?)\s+(?:copy|копия)(?:\s+(?P<number>\d+))?$", re.IGNORECASE),
 )
 
@@ -102,8 +104,6 @@ def pair_live_photos_strict(media: list[Any]) -> tuple[list[Any], set[Path]]:
 
     exact_stem_ambiguities = ambiguous_exact_stem_keys(images_by_stem, videos_by_stem)
 
-    # Strong signal: a unique 1:1 Apple ID may cross stems, but must not consume
-    # a same-stem JPG+HEIC+MOV group that is explicitly ambiguous.
     for content_id in sorted(set(images_by_id) & set(videos_by_id)):
         image_group = images_by_id[content_id]
         video_group = videos_by_id[content_id]
@@ -121,9 +121,6 @@ def pair_live_photos_strict(media: list[Any]) -> tuple[list[Any], set[Path]]:
         paired_images.add(image.source)
         used_videos.add(video.source)
 
-    # Weak signal: filename fallback is forbidden in any copy-name family.
-    # This prevents IMG_8271.HEIC from stealing IMG_8271.MOV when the real Live
-    # still was renamed to IMG_8271 2.HEIC and identifiers are missing.
     copy_collisions = collision_family_keys([*images, *videos])
     for key, image_group in images_by_stem.items():
         video_group = videos_by_stem.get(key, [])
