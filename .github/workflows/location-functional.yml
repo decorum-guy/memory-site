@@ -1,0 +1,102 @@
+name: Location import and fullscreen verification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "assets/location-overlay.css"
+      - "assets/location-overlay.js"
+      - "tools/location_enrichment.py"
+      - "tools/import_with_locations.py"
+      - "tools/macos_reverse_geocoder.swift"
+      - "tools/studio-round4.css"
+      - "tools/studio-round4.js"
+      - "preview/demo_memories.js"
+      - "preview/verify_locations.mjs"
+      - ".github/workflows/location-functional.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  python-and-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate Python helpers
+        run: |
+          python -m py_compile tools/location_enrichment.py tools/import_with_locations.py
+          python - <<'PY'
+          from tools.location_enrichment import cache_key, format_geocoder_result, metadata_location
+
+          assert cache_key(55.7522, 37.6156) == "55.752,37.616"
+          assert metadata_location({
+              "Sub-location": "ВДНХ",
+              "City": "Москва",
+              "Country": "Россия",
+          }) == "ВДНХ, Москва, Россия"
+          assert format_geocoder_result({
+              "areasOfInterest": ["Парк Горького"],
+              "locality": "Москва",
+              "country": "Россия",
+          }) == "Парк Горького, Москва, Россия"
+          print("Location helpers: OK")
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Prepare location fixture
+        run: |
+          cp preview/demo_memories.js content/memories.js
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("content/memories.js")
+          text = path.read_text(encoding="utf-8")
+          needle = '{ id: "d01", kind: "photo", src: "preview/demo-media/photo-02.jpg", thumb: "preview/demo-media/photo-02.jpg", caption: "Сначала просто кофе.", takenAt: "2023-11-18T16:21:00" }'
+          replacement = '{ id: "d01", kind: "photo", src: "preview/demo-media/photo-02.jpg", thumb: "preview/demo-media/photo-02.jpg", caption: "Сначала просто кофе.", takenAt: "2023-11-18T16:21:00", location: "Москва, Россия", gps: { lat: 55.7522, lon: 37.6156 } }'
+          assert needle in text, "Demo location fixture target not found"
+          path.write_text(text.replace(needle, replacement, 1), encoding="utf-8")
+          PY
+          node --check assets/location-overlay.js
+          node --check tools/studio-round4.js
+          node --check preview/verify_locations.mjs
+
+      - name: Install Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund playwright@1.54.2
+          npx playwright install --with-deps chromium
+
+      - name: Verify reader and Studio locations
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/location-server.log 2>&1 &
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:4173/ >/dev/null && break
+            sleep 1
+          done
+          node preview/verify_locations.mjs
+
+  swift-helper:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Compile macOS reverse geocoder
+        run: |
+          xcrun swiftc -O tools/macos_reverse_geocoder.swift -o /tmp/macos-reverse-geocoder -framework CoreLocation
+          test -x /tmp/macos-reverse-geocoder
