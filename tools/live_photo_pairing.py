@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Strict Live Photo pairing shared by import and preflight.
+"""Lossless Live Photo pairing shared by import, preflight and audit.
 
-A matching filename is only a last-resort signal. Exact Apple
-ContentIdentifier matches are preferred only for unambiguous files. Filename
-fallback is allowed only for one image + one video in the same folder, with no
-identifiers on either side and a close timestamp. Any same-stem group with
-multiple images or multiple videos remains fully independent so no source file
-can disappear from the book.
+Pairing priority:
+1. A unique Apple ContentIdentifier match is authoritative, even when Finder or
+   Photos renamed the still image because another file already used the name.
+2. Filename fallback is allowed only for one image + one video with the exact
+   same stem, no identifiers, a close timestamp, and no sibling copy-name
+   collision such as ``IMG_8271 2.HEIC`` next to ``IMG_8271.MOV``.
+
+Ambiguous files remain independent. Source files are never renamed or changed.
 """
 from __future__ import annotations
 
@@ -18,27 +20,50 @@ from typing import Any, Callable, Iterable
 
 FALLBACK_MAX_SECONDS = 120
 
+# Names commonly created by Finder/Photos/export collisions. A suffix is only
+# treated as a collision signal when another sibling belongs to the same base
+# family, so ordinary names are not changed or rewritten.
+_COPY_SUFFIX_PATTERNS = (
+    re.compile(r"^(?P<base>.+?)\s+\((?P<number>\d+)\)$", re.IGNORECASE),
+    re.compile(r"^(?P<base>.+?)\s+(?P<number>[2-9]\d*)$", re.IGNORECASE),
+    re.compile(r"^(?P<base>.+?)[_-](?P<number>[2-9]\d*)$", re.IGNORECASE),
+    re.compile(r"^(?P<base>.+?)\s+(?:copy|копия)(?:\s+(?P<number>\d+))?$", re.IGNORECASE),
+)
+
 
 def stem_key(path: Path) -> tuple[str, str]:
     return (path.parent.resolve().as_posix().casefold(), path.stem.casefold())
+
+
+def copy_family_stem(stem: str) -> str:
+    """Return the probable pre-collision stem without modifying any file."""
+    value = stem.strip()
+    for pattern in _COPY_SUFFIX_PATTERNS:
+        match = pattern.match(value)
+        if match:
+            base = match.group("base").strip()
+            if base:
+                return base
+    return value
+
+
+def copy_family_key(path: Path) -> tuple[str, str]:
+    return (
+        path.parent.resolve().as_posix().casefold(),
+        copy_family_stem(path.stem).casefold(),
+    )
 
 
 def _time_distance(left: Any, right: Any) -> float:
     return abs((left.taken_at - right.taken_at).total_seconds())
 
 
-def ambiguous_stem_keys(
-    images_by_stem: dict[tuple[str, str], list[Any]],
-    videos_by_stem: dict[tuple[str, str], list[Any]],
-) -> set[tuple[str, str]]:
-    keys = set(images_by_stem) | set(videos_by_stem)
-    return {
-        key
-        for key in keys
-        if images_by_stem.get(key)
-        and videos_by_stem.get(key)
-        and (len(images_by_stem[key]) != 1 or len(videos_by_stem[key]) != 1)
-    }
+def collision_family_keys(items: Iterable[Any]) -> set[tuple[str, str]]:
+    """Families containing multiple actual stems, e.g. IMG_1 and IMG_1 2."""
+    stems_by_family: dict[tuple[str, str], set[tuple[str, str]]] = defaultdict(set)
+    for item in items:
+        stems_by_family[copy_family_key(item.source)].add(stem_key(item.source))
+    return {key for key, stems in stems_by_family.items() if len(stems) > 1}
 
 
 def pair_live_photos_strict(media: list[Any]) -> tuple[list[Any], set[Path]]:
@@ -46,53 +71,57 @@ def pair_live_photos_strict(media: list[Any]) -> tuple[list[Any], set[Path]]:
     images = [item for item in media if item.is_image]
     videos = [item for item in media if not item.is_image]
     used_videos: set[Path] = set()
+    paired_images: set[Path] = set()
 
+    images_by_id: dict[str, list[Any]] = defaultdict(list)
     videos_by_id: dict[str, list[Any]] = defaultdict(list)
     images_by_stem: dict[tuple[str, str], list[Any]] = defaultdict(list)
     videos_by_stem: dict[tuple[str, str], list[Any]] = defaultdict(list)
 
     for image in images:
+        if image.content_id:
+            images_by_id[str(image.content_id)].append(image)
         images_by_stem[stem_key(image.source)].append(image)
     for video in videos:
         if video.content_id:
             videos_by_id[str(video.content_id)].append(video)
         videos_by_stem[stem_key(video.source)].append(video)
 
-    ambiguous = ambiguous_stem_keys(images_by_stem, videos_by_stem)
-
-    # Strong signal: Apple ContentIdentifier must match exactly, but even an
-    # identifier cannot collapse an ambiguous IMG_1234.JPG/HEIC/MOV group.
-    for image in images:
-        if not image.content_id or stem_key(image.source) in ambiguous:
+    # Strong signal: only a unique 1:1 Apple identifier match is accepted.
+    # Stems may differ because Finder can rename only the HEIC half of a pair.
+    for content_id in sorted(set(images_by_id) & set(videos_by_id)):
+        image_group = images_by_id[content_id]
+        video_group = videos_by_id[content_id]
+        if len(image_group) != 1 or len(video_group) != 1:
             continue
-        candidates = [
-            candidate
-            for candidate in videos_by_id.get(str(image.content_id), [])
-            if candidate.source not in used_videos
-            and stem_key(candidate.source) not in ambiguous
-        ]
-        if not candidates:
+        image = image_group[0]
+        video = video_group[0]
+        if image.source in paired_images or video.source in used_videos:
             continue
-        best = min(candidates, key=lambda candidate: _time_distance(image, candidate))
-        image.live_source = best.source
-        used_videos.add(best.source)
+        image.live_source = video.source
+        paired_images.add(image.source)
+        used_videos.add(video.source)
 
-    # Weak signal: same folder + same stem is accepted only when unambiguous.
+    # Weak signal: filename fallback is forbidden in any copy-name family.
+    # This prevents IMG_8271.HEIC from stealing IMG_8271.MOV when the real Live
+    # still was renamed to IMG_8271 2.HEIC and identifiers are missing.
+    copy_collisions = collision_family_keys([*images, *videos])
     for key, image_group in images_by_stem.items():
-        if key in ambiguous:
-            continue
         video_group = videos_by_stem.get(key, [])
         if len(image_group) != 1 or len(video_group) != 1:
             continue
         image = image_group[0]
         video = video_group[0]
-        if image.live_source or video.source in used_videos:
+        if image.source in paired_images or video.source in used_videos:
+            continue
+        if copy_family_key(image.source) in copy_collisions:
             continue
         if image.content_id or video.content_id:
             continue
         if _time_distance(image, video) > FALLBACK_MAX_SECONDS:
             continue
         image.live_source = video.source
+        paired_images.add(image.source)
         used_videos.add(video.source)
 
     return media, used_videos
@@ -129,12 +158,13 @@ def estimate_live_pairs_strict(
     date_keys: Iterable[str],
     first_value: Callable[[dict[str, Any], Iterable[str]], Any],
 ) -> int:
-    """Use the same strict rules for the dry-run Live Photo count."""
+    """Use the same lossless rules for the dry-run Live Photo count."""
     images = [path for path in paths if path.suffix.lower() in image_exts]
     videos = [path for path in paths if path.suffix.lower() in video_exts]
 
     image_info: dict[Path, tuple[str, dt.datetime]] = {}
     video_info: dict[Path, tuple[str, dt.datetime]] = {}
+    images_by_id: dict[str, list[Path]] = defaultdict(list)
     videos_by_id: dict[str, list[Path]] = defaultdict(list)
     images_by_stem: dict[tuple[str, str], list[Path]] = defaultdict(list)
     videos_by_stem: dict[tuple[str, str], list[Path]] = defaultdict(list)
@@ -148,6 +178,9 @@ def estimate_live_pairs_strict(
 
     for image in images:
         image_info[image] = info(image)
+        content_id, _ = image_info[image]
+        if content_id:
+            images_by_id[content_id].append(image)
         images_by_stem[stem_key(image)].append(image)
     for video in videos:
         video_info[video] = info(video)
@@ -156,28 +189,26 @@ def estimate_live_pairs_strict(
             videos_by_id[content_id].append(video)
         videos_by_stem[stem_key(video)].append(video)
 
-    ambiguous = ambiguous_stem_keys(images_by_stem, videos_by_stem)
     used: set[Path] = set()
     paired_images: set[Path] = set()
 
-    for image in images:
-        content_id, image_time = image_info[image]
-        if not content_id or stem_key(image) in ambiguous:
+    for content_id in sorted(set(images_by_id) & set(videos_by_id)):
+        image_group = images_by_id[content_id]
+        video_group = videos_by_id[content_id]
+        if len(image_group) != 1 or len(video_group) != 1:
             continue
-        candidates = [
-            path
-            for path in videos_by_id.get(content_id, [])
-            if path not in used and stem_key(path) not in ambiguous
-        ]
-        if not candidates:
-            continue
-        best = min(candidates, key=lambda path: abs((video_info[path][1] - image_time).total_seconds()))
-        used.add(best)
+        image = image_group[0]
+        video = video_group[0]
         paired_images.add(image)
+        used.add(video)
+
+    path_items = [
+        type("PathItem", (), {"source": path})()
+        for path in [*images, *videos]
+    ]
+    copy_collisions = collision_family_keys(path_items)
 
     for key, image_group in images_by_stem.items():
-        if key in ambiguous:
-            continue
         video_group = videos_by_stem.get(key, [])
         if len(image_group) != 1 or len(video_group) != 1:
             continue
@@ -185,13 +216,15 @@ def estimate_live_pairs_strict(
         video = video_group[0]
         if image in paired_images or video in used:
             continue
+        if copy_family_key(image) in copy_collisions:
+            continue
         image_id, image_time = image_info[image]
         video_id, video_time = video_info[video]
         if image_id or video_id:
             continue
         if abs((video_time - image_time).total_seconds()) > FALLBACK_MAX_SECONDS:
             continue
-        used.add(video)
         paired_images.add(image)
+        used.add(video)
 
     return len(used)
