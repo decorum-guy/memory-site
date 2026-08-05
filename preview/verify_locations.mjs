@@ -29,10 +29,10 @@ try {
 
   const studio = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await studio.goto(`${base}/tools/studio.html`, { waitUntil: "networkidle" });
-  const field = studio.locator('[data-location]').first();
+  const field = studio.locator('[data-location][value="Москва, Россия"]');
   await field.waitFor({ state: "visible" });
   assert((await field.inputValue()) === "Москва, Россия", "Imported place did not reach Memory Studio");
-  const hint = studio.locator(".item-location-field small").first();
+  const hint = field.locator("xpath=..").locator("small");
   assert((await hint.textContent())?.includes("55.75220"), "Saved GPS hint is missing in Memory Studio");
   await field.fill("Наше место");
   await field.press("Tab");
