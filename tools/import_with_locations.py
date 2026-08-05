@@ -9,6 +9,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -17,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / "tools" / "import_workflow.py"
 ENRICHER = ROOT / "tools" / "location_enrichment.py"
 TEST_ROOT = ROOT / ".memory-test" / "site"
+SHARED_CACHE = ROOT / ".memory-location-cache.json"
 
 
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
@@ -28,6 +30,18 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
     return args, passthrough
 
 
+def sync_cache_to_test() -> None:
+    if not SHARED_CACHE.is_file() or not TEST_ROOT.is_dir():
+        return
+    shutil.copy2(SHARED_CACHE, TEST_ROOT / SHARED_CACHE.name)
+
+
+def sync_cache_from_test() -> None:
+    test_cache = TEST_ROOT / SHARED_CACHE.name
+    if test_cache.is_file():
+        shutil.copy2(test_cache, SHARED_CACHE)
+
+
 def main() -> int:
     args, passthrough = parse_args()
     source = args.source.expanduser().resolve()
@@ -37,6 +51,9 @@ def main() -> int:
         return result.returncode
 
     target_root = TEST_ROOT if args.mode == "test" else ROOT
+    if args.mode == "test":
+        sync_cache_to_test()
+
     enrich_command = [
         sys.executable,
         str(ENRICHER),
@@ -49,6 +66,10 @@ def main() -> int:
 
     print("\n=== MEMORY LOCATION ENRICHMENT ===")
     enriched = subprocess.run(enrich_command)
+    if args.mode == "test" and enriched.returncode == 0:
+        sync_cache_from_test()
+        print(f"Общий кэш мест сохранён: {SHARED_CACHE}")
+
     if enriched.returncode != 0:
         print(
             "Импорт медиа завершён, но названия мест не добавлены. "
