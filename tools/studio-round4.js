@@ -10,6 +10,17 @@
       if (year && (!chapter.number || /^\d{1,2}$/.test(String(chapter.number)))) chapter.number = year;
       chapter.kicker ||= "Глава по времени";
       chapter.subtitle ||= "";
+      (chapter.blocks || []).forEach((block) => {
+        (block.items || []).forEach((item) => {
+          const location = String(item.location || "").trim();
+          if (location) item.location = location;
+          else delete item.location;
+          const lat = Number(item.gps?.lat);
+          const lon = Number(item.gps?.lon);
+          if (Number.isFinite(lat) && Number.isFinite(lon)) item.gps = { lat, lon };
+          else delete item.gps;
+        });
+      });
     });
     const years = book.chapters.map((chapter) => String(chapter.title || "").match(/\b(?:19|20)\d{2}\b/)?.[0]).filter(Boolean);
     book.meta.archiveLabel ||= years.length ? `АРХИВ · ${years[0]}${years.length > 1 ? `—${years[years.length - 1]}` : ""}` : "АРХИВ ВОСПОМИНАНИЙ";
@@ -37,6 +48,32 @@
     return details;
   };
 
+  const baseRenderItem = renderItem;
+  renderItem = function round4RenderItem(item, chapterIndex, blockIndex, itemIndex) {
+    const card = baseRenderItem(item, chapterIndex, blockIndex, itemIndex);
+    const fields = card.querySelector(".item-fields");
+    const expand = fields?.querySelector("[data-expand]");
+    if (!fields || !expand) return card;
+
+    const label = document.createElement("label");
+    label.className = "item-location-field";
+    label.innerHTML = `
+      <span>Местоположение в открытой карточке</span>
+      <input data-location type="text" value="${escapeAttr(item.location || "")}" placeholder="Например: Москва, Россия или Наш двор" />
+      <small>${gpsHint(item)}</small>`;
+    fields.insertBefore(label, expand);
+    label.querySelector("[data-location]").addEventListener("change", (inputEvent) => {
+      snapshot();
+      const value = String(inputEvent.target.value || "").trim();
+      if (value) item.location = value;
+      else delete item.location;
+      status.textContent = value
+        ? "Местоположение изменено. Экспортируй memories.js, чтобы применить его к книге."
+        : "Местоположение скрыто. Экспортируй memories.js, чтобы применить изменение.";
+    });
+    return card;
+  };
+
   const baseRender = render;
   render = function round4Render() {
     baseRender();
@@ -53,6 +90,13 @@
       <a class="is-active" href="studio.html" aria-current="page">Memory Studio</a>
       <a href="telegram_studio.html">Telegram Studio</a>`;
     top.prepend(tabs);
+  }
+
+  function gpsHint(item) {
+    const lat = Number(item.gps?.lat);
+    const lon = Number(item.gps?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return "GPS в исходном файле отсутствует — поле можно заполнить вручную или оставить пустым.";
+    return `GPS сохранён: ${lat.toFixed(5)}, ${lon.toFixed(5)}. Координаты в книге не показываются.`;
   }
 
   function renderBookSettings() {
