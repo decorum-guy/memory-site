@@ -16,7 +16,7 @@ import webbrowser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = ROOT / "tools" / "import_workflow.py"
+WORKFLOW = ROOT / "tools" / "import_workflow_strict.py"
 ENRICHER = ROOT / "tools" / "location_enrichment.py"
 TEST_ROOT = ROOT / ".memory-test" / "site"
 SHARED_CACHE = ROOT / ".memory-location-cache.json"
