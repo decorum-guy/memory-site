@@ -1,0 +1,109 @@
+name: Strict Live Photo pairing
+
+on:
+  pull_request:
+    paths:
+      - "tools/live_photo_pairing.py"
+      - "tools/import_memories_strict.py"
+      - "tools/import_workflow_strict.py"
+      - "tools/import_with_locations.py"
+      - ".github/workflows/live-photo-pairing.yml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review-round-2-polish
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate strict pairing
+        run: |
+          python -m py_compile \
+            tools/live_photo_pairing.py \
+            tools/import_memories_strict.py \
+            tools/import_workflow_strict.py \
+            tools/import_with_locations.py
+
+          PYTHONPATH=tools python - <<'PY'
+          import datetime as dt
+          import tempfile
+          from dataclasses import dataclass
+          from pathlib import Path
+
+          from live_photo_pairing import pair_live_photos_strict
+
+          @dataclass
+          class FakeMedia:
+              source: Path
+              kind: str
+              taken_at: dt.datetime
+              content_id: str | None = None
+              live_source: Path | None = None
+
+              @property
+              def is_image(self):
+                  return self.kind == "image"
+
+          now = dt.datetime(2026, 8, 6, 0, 0, 0)
+
+          with tempfile.TemporaryDirectory() as raw:
+              root = Path(raw)
+
+              # User case: IMG_7766.JPG + IMG_7766.HEIC + IMG_7766.MOV are
+              # three independent media. Same stem alone must not consume MOV.
+              triple = [
+                  FakeMedia(root / "IMG_7766.JPG", "image", now),
+                  FakeMedia(root / "IMG_7766.HEIC", "image", now + dt.timedelta(seconds=1)),
+                  FakeMedia(root / "IMG_7766.MOV", "video", now + dt.timedelta(seconds=2)),
+              ]
+              _, used = pair_live_photos_strict(triple)
+              assert not used
+              assert all(item.live_source is None for item in triple[:2])
+              assert len(triple[:2]) + len([item for item in triple[2:] if item.source not in used]) == 3
+
+              # Matching Apple identifiers are authoritative even with another
+              # same-stem image present.
+              exact = [
+                  FakeMedia(root / "exact" / "IMG_1000.HEIC", "image", now, "live-1"),
+                  FakeMedia(root / "exact" / "IMG_1000.JPG", "image", now, "other-image"),
+                  FakeMedia(root / "exact" / "IMG_1000.MOV", "video", now, "live-1"),
+              ]
+              _, used = pair_live_photos_strict(exact)
+              assert exact[0].live_source == exact[2].source
+              assert exact[1].live_source is None
+              assert used == {exact[2].source}
+
+              # A legacy export without identifiers can still pair when the
+              # group is exactly one image + one video and timestamps are close.
+              legacy = [
+                  FakeMedia(root / "legacy" / "IMG_2000.HEIC", "image", now),
+                  FakeMedia(root / "legacy" / "IMG_2000.MOV", "video", now + dt.timedelta(seconds=8)),
+              ]
+              _, used = pair_live_photos_strict(legacy)
+              assert legacy[0].live_source == legacy[1].source
+              assert used == {legacy[1].source}
+
+              # Same stem in different folders is never enough.
+              folders = [
+                  FakeMedia(root / "a" / "IMG_3000.HEIC", "image", now),
+                  FakeMedia(root / "b" / "IMG_3000.MOV", "video", now),
+              ]
+              _, used = pair_live_photos_strict(folders)
+              assert not used
+
+              # Conflicting identifiers must remain independent.
+              mismatch = [
+                  FakeMedia(root / "mismatch" / "IMG_4000.HEIC", "image", now, "photo-id"),
+                  FakeMedia(root / "mismatch" / "IMG_4000.MOV", "video", now, "video-id"),
+              ]
+              _, used = pair_live_photos_strict(mismatch)
+              assert not used
+
+          print("Strict Live Photo pairing: OK")
+          PY
