@@ -5,6 +5,8 @@ Thumbs.db
 .memory-venv/
 .memory-test/
 .memory-backups/
+.memory-tools/
+.memory-location-cache.json
 import/
 ORIGINALS/
 media/generated/
@@ -14,5 +16,6 @@ node_modules/
 package.json
 package-lock.json
 content/memories.backup-*.js
+content/memories.before-location-*.js
 __pycache__/
 *.pyc
