@@ -12,6 +12,7 @@ import argparse
 import shutil
 import subprocess
 import sys
+import webbrowser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,6 +27,7 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser.add_argument("mode", choices=["dry-run", "test", "import"])
     parser.add_argument("source", type=Path)
     parser.add_argument("--no-geocode", action="store_true", help="Не использовать геокодер macOS")
+    parser.add_argument("--open", action="store_true", help="Открыть готовую книгу после импорта и геокодирования")
     args, passthrough = parser.parse_known_args()
     return args, passthrough
 
@@ -40,6 +42,14 @@ def sync_cache_from_test() -> None:
     test_cache = TEST_ROOT / SHARED_CACHE.name
     if test_cache.is_file():
         shutil.copy2(test_cache, SHARED_CACHE)
+
+
+def open_book(root: Path) -> None:
+    url = (root / "index.html").resolve().as_uri() + "?opened=1#memory-book"
+    if sys.platform == "darwin":
+        subprocess.run(["open", url], check=False)
+    else:
+        webbrowser.open(url)
 
 
 def main() -> int:
@@ -76,7 +86,11 @@ def main() -> int:
             "Исправь ошибку выше и повтори только tools/location_enrichment.py.",
             file=sys.stderr,
         )
-    return enriched.returncode
+        return enriched.returncode
+
+    if args.open:
+        open_book(target_root)
+    return 0
 
 
 if __name__ == "__main__":
