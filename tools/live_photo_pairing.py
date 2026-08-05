@@ -4,11 +4,15 @@
 Pairing priority:
 1. A unique Apple ContentIdentifier match is authoritative, even when Finder or
    Photos renamed the still image because another file already used the name.
-2. Filename fallback is allowed only for one image + one video with the exact
+2. An exact same-stem group containing multiple images or videos is considered
+   ambiguous and stays fully independent, even if one identifier happens to
+   match. This preserves cases such as JPG + HEIC + MOV that the user knows are
+   three separate media.
+3. Filename fallback is allowed only for one image + one video with the exact
    same stem, no identifiers, a close timestamp, and no sibling copy-name
    collision such as ``IMG_8271 2.HEIC`` next to ``IMG_8271.MOV``.
 
-Ambiguous files remain independent. Source files are never renamed or changed.
+Source files are never renamed or changed.
 """
 from __future__ import annotations
 
@@ -20,9 +24,6 @@ from typing import Any, Callable, Iterable
 
 FALLBACK_MAX_SECONDS = 120
 
-# Names commonly created by Finder/Photos/export collisions. A suffix is only
-# treated as a collision signal when another sibling belongs to the same base
-# family, so ordinary names are not changed or rewritten.
 _COPY_SUFFIX_PATTERNS = (
     re.compile(r"^(?P<base>.+?)\s+\((?P<number>\d+)\)$", re.IGNORECASE),
     re.compile(r"^(?P<base>.+?)\s+(?P<number>[2-9]\d*)$", re.IGNORECASE),
@@ -66,6 +67,18 @@ def collision_family_keys(items: Iterable[Any]) -> set[tuple[str, str]]:
     return {key for key, stems in stems_by_family.items() if len(stems) > 1}
 
 
+def ambiguous_exact_stem_keys(
+    images_by_stem: dict[tuple[str, str], list[Any]],
+    videos_by_stem: dict[tuple[str, str], list[Any]],
+) -> set[tuple[str, str]]:
+    """Exact stems containing 2+ images or 2+ videos alongside the other kind."""
+    return {
+        key
+        for key in set(images_by_stem) & set(videos_by_stem)
+        if len(images_by_stem[key]) != 1 or len(videos_by_stem[key]) != 1
+    }
+
+
 def pair_live_photos_strict(media: list[Any]) -> tuple[list[Any], set[Path]]:
     """Pair only confident Live Photos and preserve every ambiguous file."""
     images = [item for item in media if item.is_image]
@@ -87,8 +100,10 @@ def pair_live_photos_strict(media: list[Any]) -> tuple[list[Any], set[Path]]:
             videos_by_id[str(video.content_id)].append(video)
         videos_by_stem[stem_key(video.source)].append(video)
 
-    # Strong signal: only a unique 1:1 Apple identifier match is accepted.
-    # Stems may differ because Finder can rename only the HEIC half of a pair.
+    exact_stem_ambiguities = ambiguous_exact_stem_keys(images_by_stem, videos_by_stem)
+
+    # Strong signal: a unique 1:1 Apple ID may cross stems, but must not consume
+    # a same-stem JPG+HEIC+MOV group that is explicitly ambiguous.
     for content_id in sorted(set(images_by_id) & set(videos_by_id)):
         image_group = images_by_id[content_id]
         video_group = videos_by_id[content_id]
@@ -96,6 +111,10 @@ def pair_live_photos_strict(media: list[Any]) -> tuple[list[Any], set[Path]]:
             continue
         image = image_group[0]
         video = video_group[0]
+        if stem_key(image.source) in exact_stem_ambiguities:
+            continue
+        if stem_key(video.source) in exact_stem_ambiguities:
+            continue
         if image.source in paired_images or video.source in used_videos:
             continue
         image.live_source = video.source
@@ -189,6 +208,7 @@ def estimate_live_pairs_strict(
             videos_by_id[content_id].append(video)
         videos_by_stem[stem_key(video)].append(video)
 
+    exact_stem_ambiguities = ambiguous_exact_stem_keys(images_by_stem, videos_by_stem)
     used: set[Path] = set()
     paired_images: set[Path] = set()
 
@@ -199,13 +219,12 @@ def estimate_live_pairs_strict(
             continue
         image = image_group[0]
         video = video_group[0]
+        if stem_key(image) in exact_stem_ambiguities or stem_key(video) in exact_stem_ambiguities:
+            continue
         paired_images.add(image)
         used.add(video)
 
-    path_items = [
-        type("PathItem", (), {"source": path})()
-        for path in [*images, *videos]
-    ]
+    path_items = [type("PathItem", (), {"source": path})() for path in [*images, *videos]]
     copy_collisions = collision_family_keys(path_items)
 
     for key, image_group in images_by_stem.items():
