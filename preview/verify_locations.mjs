@@ -30,6 +30,8 @@ try {
   const studio = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await studio.goto(`${base}/tools/studio.html`, { waitUntil: "networkidle" });
   const field = studio.locator('[data-location][value="Москва, Россия"]');
+  await field.waitFor({ state: "attached" });
+  await field.evaluate((node) => { const chapter = node.closest("details"); if (chapter) chapter.open = true; });
   await field.waitFor({ state: "visible" });
   assert((await field.inputValue()) === "Москва, Россия", "Imported place did not reach Memory Studio");
   const hint = field.locator("xpath=..").locator("small");
