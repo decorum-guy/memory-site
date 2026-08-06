@@ -1,5 +1,6 @@
 /* Interaction corrections from production review. Loaded after all legacy
-   reader styles so the visible order matches Memory Studio exactly. */
+   reader styles. Card order is fixed in the DOM, while the existing scrapbook
+   rotations, offsets and layer depth remain untouched. */
 
 .event-preview__count {
   z-index: 35;
@@ -11,28 +12,6 @@
 .event-layout-stack .event-preview__item:hover,
 .event-layout-stack .event-preview__item:focus-visible {
   z-index: 120 !important;
-}
-
-/* Large events keep a scrapbook tilt, but no random horizontal/vertical shifts
-   or random layers are allowed to obscure the left-to-right narrative order. */
-.event-layout-stack .event-preview__item,
-.event-layout-stack .event-preview__item--1,
-.event-layout-stack .event-preview__item--2,
-.event-layout-stack .event-preview__item--3,
-.event-layout-stack .event-preview__item--4,
-.event-layout-stack .event-preview__item--5,
-.event-layout-stack .event-preview__item--6,
-.event-layout-stack .event-preview__item--7,
-.event-layout-stack .event-preview__item--8 {
-  width: calc(100% + 1rem);
-  max-width: 18rem;
-  z-index: 2;
-  transform: rotate(var(--event-ordered-rotate, 0deg));
-}
-
-.event-layout-stack .event-preview__item:hover,
-.event-layout-stack .event-preview__item:focus-visible {
-  transform: translateY(-.35rem) rotate(0deg) scale(1.035);
 }
 
 .lightbox__location {
