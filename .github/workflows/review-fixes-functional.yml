@@ -13,6 +13,7 @@ on:
       - "tools/studio-round4.js"
       - "tools/studio-crop-bounds.js"
       - "tools/telegram_server.py"
+      - "tools/memory_server.py"
       - "preview/verify_review_fixes.mjs"
       - ".github/workflows/review-fixes-functional.yml"
 
@@ -119,7 +120,7 @@ jobs:
 
       - name: Run reader and Studio verification
         run: |
-          python3 tools/telegram_server.py >/tmp/memory-server.log 2>&1 &
+          python3 tools/memory_server.py >/tmp/memory-server.log 2>&1 &
           for attempt in {1..30}; do
             curl --fail --silent http://127.0.0.1:8765/ >/dev/null && break
             sleep 1
