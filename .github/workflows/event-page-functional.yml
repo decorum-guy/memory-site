@@ -37,7 +37,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Prepare thirteen-item event fixture
+      - name: Prepare event identity and thirteen-item fixtures
         run: |
           python -m pip install --disable-pip-version-check pillow
           mkdir -p preview/demo-media
@@ -53,8 +53,11 @@ jobs:
           )
           items = []
           for index in range(13):
+              # Two different files intentionally share the same public id and
+              # source path. Reader must still render both instances.
+              item_id = "duplicate-media" if index in (10, 11) else f"large-{index + 1:02d}"
               items.append({
-                  "id": f"large-{index + 1:02d}",
+                  "id": item_id,
                   "kind": "photo",
                   "src": "preview/demo-media/photo-01.jpg",
                   "thumb": "preview/demo-media/photo-01.jpg",
@@ -62,6 +65,19 @@ jobs:
                   "takenAt": f"2026-07-10T12:{index:02d}:00",
                   "censored": False,
               })
+
+          second_items = []
+          for index in range(4):
+              second_items.append({
+                  "id": f"same-day-other-{index + 1}",
+                  "kind": "photo",
+                  "src": "preview/demo-media/photo-01.jpg",
+                  "thumb": "preview/demo-media/photo-01.jpg",
+                  "caption": f"Другое событие {index + 1}",
+                  "takenAt": f"2026-07-10T18:{index:02d}:00",
+                  "censored": False,
+              })
+
           book = {
               "meta": {"title": "Проверка большой страницы", "accent": "#9c3f43"},
               "chapters": [{
@@ -71,14 +87,26 @@ jobs:
                   "title": "2026",
                   "layout": "wide",
                   "theme": "ochre",
-                  "blocks": [{
-                      "type": "event",
-                      "id": "large-event",
-                      "title": "10 июля 2026",
-                      "caption": "Все файлы должны быть видны без раскрытия.",
-                      "layout": "stack",
-                      "items": items,
-                  }],
+                  "blocks": [
+                      {
+                          "type": "event",
+                          "id": "large-event",
+                          "title": "10 июля 2026",
+                          "caption": "Все файлы должны быть видны без раскрытия.",
+                          "layout": "stack",
+                          "items": items,
+                      },
+                      {
+                          # The same date and even a duplicated block id must not
+                          # cause the same layout when the media set differs.
+                          "type": "event",
+                          "id": "large-event",
+                          "title": "10 июля 2026",
+                          "caption": "Второе отдельное событие того же дня.",
+                          "layout": "collage",
+                          "items": second_items,
+                      },
+                  ],
               }],
           }
           Path("content/memories.js").write_text(
