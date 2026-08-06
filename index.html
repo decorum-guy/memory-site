@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="assets/cursor-scrapbook-pencil-final-v19.css" />
   <link rel="stylesheet" href="assets/round4-polish.css" />
   <link rel="stylesheet" href="assets/location-overlay.css" />
+  <link rel="stylesheet" href="assets/reader-layout-fixes.css" />
 </head>
 <body>
   <div class="ambient-grain" aria-hidden="true"></div>
@@ -46,23 +47,25 @@
     <button class="lightbox__close" id="lightbox-close" type="button" aria-label="Закрыть">×</button>
     <button class="lightbox__nav lightbox__nav--prev" id="lightbox-prev" type="button" aria-label="Предыдущий файл">‹</button>
     <figure class="lightbox__figure">
-      <div class="lightbox__location" id="lightbox-location" aria-live="polite" hidden></div>
-      <img class="lightbox__image" id="lightbox-image" alt="" />
-      <video class="lightbox__video" id="lightbox-video" playsinline preload="metadata" hidden></video>
+      <div class="lightbox__media-shell">
+        <div class="lightbox__location" id="lightbox-location" aria-live="polite" hidden></div>
+        <img class="lightbox__image" id="lightbox-image" alt="" />
+        <video class="lightbox__video" id="lightbox-video" playsinline preload="metadata" hidden></video>
+        <div class="lightbox__censor" id="lightbox-censor" hidden>
+          <div class="lightbox__censor-card">
+            <button class="lightbox__censor-close" id="lightbox-censor-close" type="button" aria-label="Закрыть предупреждение">×</button>
+            <span aria-hidden="true">!</span>
+            <h2>Содержание может быть шокирующим</h2>
+            <p>Этот момент скрыт намеренно. Открывай только если готова его увидеть.</p>
+            <button id="lightbox-censor-show" type="button">Показать</button>
+          </div>
+        </div>
+      </div>
+      <figcaption class="lightbox__caption" id="lightbox-caption"></figcaption>
       <div class="lightbox__live-controls">
         <button class="lightbox__live" id="lightbox-live" type="button" hidden>▶ Оживить фото</button>
         <button class="lightbox__sound" id="lightbox-live-sound" type="button" hidden aria-pressed="false" aria-label="Выключить звук" title="Выключить звук">🔊</button>
       </div>
-      <div class="lightbox__censor" id="lightbox-censor" hidden>
-        <div class="lightbox__censor-card">
-          <button class="lightbox__censor-close" id="lightbox-censor-close" type="button" aria-label="Закрыть предупреждение">×</button>
-          <span aria-hidden="true">!</span>
-          <h2>Содержание может быть шокирующим</h2>
-          <p>Этот момент скрыт намеренно. Открывай только если готова его увидеть.</p>
-          <button id="lightbox-censor-show" type="button">Показать</button>
-        </div>
-      </div>
-      <figcaption class="lightbox__caption" id="lightbox-caption"></figcaption>
     </figure>
     <button class="lightbox__nav lightbox__nav--next" id="lightbox-next" type="button" aria-label="Следующий файл">›</button>
     <p class="lightbox__counter" id="lightbox-counter"></p>
