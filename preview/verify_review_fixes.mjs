@@ -25,6 +25,24 @@ try {
   assert(order.map((entry) => entry.caption).join("|") === Array.from({ length: 9 }, (_, index) => `Порядок ${index + 1}`).join("|"),
     `Reader DOM order differs from Studio order: ${JSON.stringify(order)}`);
 
+  const scrapbook = await cards.evaluateAll((nodes) => nodes.map((node) => ({
+    rotate: Number.parseFloat(node.style.getPropertyValue("--event-rotate")),
+    x: Number.parseFloat(node.style.getPropertyValue("--event-shelf-x")),
+    y: Number.parseFloat(node.style.getPropertyValue("--event-shelf-y")),
+    layer: Number.parseInt(node.style.getPropertyValue("--event-layer"), 10),
+    transform: getComputedStyle(node).transform,
+  })));
+  assert(scrapbook.every((entry) => [entry.rotate, entry.x, entry.y, entry.layer].every(Number.isFinite)),
+    `Scrapbook layout variables disappeared: ${JSON.stringify(scrapbook)}`);
+  assert(new Set(scrapbook.map((entry) => entry.rotate.toFixed(3))).size >= 4,
+    `Card tilts were flattened: ${JSON.stringify(scrapbook)}`);
+  assert(new Set(scrapbook.map((entry) => entry.layer)).size >= 2,
+    `Card depth layers were flattened: ${JSON.stringify(scrapbook)}`);
+  assert(scrapbook.some((entry) => Math.abs(entry.x) > .05 || Math.abs(entry.y) > .05),
+    `Card scrapbook offsets were flattened: ${JSON.stringify(scrapbook)}`);
+  assert(scrapbook.every((entry) => entry.transform !== "none"),
+    `Card transforms are not applied: ${JSON.stringify(scrapbook)}`);
+
   const geometry = await cards.evaluateAll((nodes) => nodes.slice(0, 5).map((node) => {
     const rect = node.getBoundingClientRect();
     return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
@@ -116,6 +134,9 @@ try {
   console.log(JSON.stringify({
     hoveredCardAboveCount: true,
     sourceOrderPreserved: true,
+    scrapbookTiltsPreserved: true,
+    scrapbookOffsetsPreserved: true,
+    scrapbookLayersPreserved: true,
     regularVideoAutoplay: true,
     readerVideoSeekStable: true,
     mediaByteRanges: true,
