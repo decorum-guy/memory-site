@@ -10,26 +10,93 @@
   transform: none;
 }
 
-/* Imported events with 9+ items are marked as "stack". The previous layout put
-   five previews at virtually the same centre point. Keep five representative
-   cards, but expose each one in a readable shelf so every preview is clickable. */
+/* Captions live in the white paper area below the media. They never overlap the
+   image, never exceed the decorative rule width and stop after four wrapped
+   lines with a browser-rendered ellipsis. */
+.event-preview__item {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  aspect-ratio: auto;
+  padding: .55rem;
+  overflow: hidden;
+}
+.event-preview__item .image-frame {
+  flex: 0 0 auto;
+}
+.event-preview__caption,
+.event-preview__caption--short,
+.event-preview__caption--medium,
+.event-preview__caption--long {
+  position: relative;
+  inset: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  width: 72%;
+  height: auto;
+  max-height: 4.8em;
+  margin: .46rem auto 0;
+  display: -webkit-box;
+  align-items: initial;
+  justify-content: initial;
+  overflow: hidden;
+  color: #3d342c;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  pointer-events: none;
+}
+.event-preview__item::after {
+  content: "";
+  position: relative;
+  inset: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  display: block;
+  flex: 0 0 1px;
+  width: 72%;
+  height: 1px;
+  margin: .46rem auto 0;
+  background: rgba(79, 63, 47, .28);
+}
+
+/* Imported events with 9+ items are marked as "stack". Every file is appended
+   by event-page-expansion.js and the grid grows vertically without a maximum
+   height. Four desktop columns keep cards readable instead of shrinking a
+   20+ item day into one tiny row. */
 .event-layout-stack .event-preview {
   min-height: clamp(20rem, 31vw, 27rem);
+  height: auto;
+  max-height: none;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  align-items: center;
-  gap: clamp(.55rem, 1.2vw, 1rem);
-  padding: clamp(2.2rem, 5vw, 4rem) clamp(.5rem, 1.5vw, 1.5rem) 3.7rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: max-content;
+  align-items: start;
+  align-content: start;
+  column-gap: clamp(.8rem, 1.6vw, 1.4rem);
+  row-gap: clamp(1.6rem, 3vw, 2.6rem);
+  overflow: visible;
+  padding: clamp(2.2rem, 5vw, 4rem) clamp(.6rem, 1.8vw, 1.7rem) 4.2rem;
 }
 .event-layout-stack .event-preview::before {
-  inset: 8% 1.5% 6%;
+  inset: 2.5rem 1.5% 2.2rem;
 }
 .event-layout-stack .event-preview__item,
 .event-layout-stack .event-preview__item--1,
 .event-layout-stack .event-preview__item--2,
 .event-layout-stack .event-preview__item--3,
 .event-layout-stack .event-preview__item--4,
-.event-layout-stack .event-preview__item--5 {
+.event-layout-stack .event-preview__item--5,
+.event-layout-stack .event-preview__item--6,
+.event-layout-stack .event-preview__item--7,
+.event-layout-stack .event-preview__item--8 {
   position: relative;
   inset: auto;
   left: auto;
@@ -37,19 +104,22 @@
   top: auto;
   bottom: auto;
   width: 100%;
-  max-width: 13rem;
+  max-width: 15rem;
   justify-self: center;
   transform: translateY(var(--event-shelf-y, 0)) rotate(var(--event-rotate));
 }
-.event-layout-stack .event-preview__item--1 { --event-shelf-y: .7rem; }
-.event-layout-stack .event-preview__item--2 { --event-shelf-y: -.65rem; }
-.event-layout-stack .event-preview__item--3 { --event-shelf-y: .25rem; }
-.event-layout-stack .event-preview__item--4 { --event-shelf-y: -.4rem; }
-.event-layout-stack .event-preview__item--5 { --event-shelf-y: .6rem; }
+.event-layout-stack .event-preview__item--1 { --event-shelf-y: .45rem; }
+.event-layout-stack .event-preview__item--2 { --event-shelf-y: -.35rem; }
+.event-layout-stack .event-preview__item--3 { --event-shelf-y: .15rem; }
+.event-layout-stack .event-preview__item--4 { --event-shelf-y: -.2rem; }
+.event-layout-stack .event-preview__item--5 { --event-shelf-y: .35rem; }
+.event-layout-stack .event-preview__item--6 { --event-shelf-y: -.15rem; }
+.event-layout-stack .event-preview__item--7 { --event-shelf-y: .25rem; }
+.event-layout-stack .event-preview__item--8 { --event-shelf-y: -.3rem; }
 .event-layout-stack .event-preview__item:hover,
 .event-layout-stack .event-preview__item:focus-visible {
   z-index: 70;
-  transform: translateY(calc(var(--event-shelf-y, 0) - .35rem)) rotate(0) scale(1.045);
+  transform: translateY(calc(var(--event-shelf-y, 0) - .35rem)) rotate(0) scale(1.035);
 }
 
 /* The location belongs above the media, never on top of it. A dedicated shell
@@ -130,20 +200,26 @@
   .event-layout-stack .event-preview {
     min-height: 38rem;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    padding-inline: .35rem;
+    padding-inline: .45rem;
   }
-  .event-layout-stack .event-preview__item { max-width: 12rem; }
+  .event-layout-stack .event-preview__item { max-width: 13rem; }
 }
 
 @media (max-width: 600px) {
   .event-layout-stack .event-preview {
     min-height: 45rem;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-content: center;
-    gap: .8rem;
-    padding: 2rem .2rem 3.5rem;
+    gap: 1.25rem .75rem;
+    padding: 2rem .2rem 3.8rem;
   }
   .event-layout-stack .event-preview__item { max-width: 10.5rem; }
+  .event-preview__caption,
+  .event-preview__caption--short,
+  .event-preview__caption--medium,
+  .event-preview__caption--long,
+  .event-preview__item::after {
+    width: 78%;
+  }
   .lightbox {
     padding-top: 2.2rem;
     padding-bottom: 3.8rem;
