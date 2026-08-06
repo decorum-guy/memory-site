@@ -86,7 +86,7 @@ jobs:
                       "id": "ordered-event",
                       "title": "30 октября 2023",
                       "caption": "Порядок важен",
-                      "layout": "stack",
+                      "layout": "collage",
                       "items": items,
                   }],
               }],
