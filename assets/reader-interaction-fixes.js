@@ -63,6 +63,16 @@
         && (video.currentSrc || video.getAttribute("src"))
       );
 
+      const prepareAndPlay = () => {
+        if (!isRegularVideo()) return;
+        video.preload = "auto";
+        video.autoplay = true;
+        video.muted = false;
+        video.playsInline = true;
+        const result = video.play();
+        if (result && typeof result.catch === "function") result.catch(() => {});
+      };
+
       const resetSeekState = () => {
         desiredTime = null;
         desiredAt = 0;
@@ -118,13 +128,8 @@
       };
 
       const tryAutoplay = (generation) => {
-        if (generation !== sourceGeneration || !isRegularVideo()) return;
-        video.preload = "auto";
-        video.autoplay = true;
-        video.muted = false;
-        video.playsInline = true;
-        const result = video.play();
-        if (result && typeof result.catch === "function") result.catch(() => {});
+        if (generation !== sourceGeneration) return;
+        prepareAndPlay();
       };
 
       const syncSource = () => {
@@ -139,6 +144,16 @@
           window.setTimeout(() => tryAutoplay(generation), delay);
         });
       };
+
+      /* The target button's own click handler opens the lightbox first. The
+         document bubble handler then starts a regular video in the same user
+         activation, which allows audible autoplay in stricter browsers. */
+      document.addEventListener("click", (clickEvent) => {
+        if (!clickEvent.target.closest(
+          ".event-preview__item, .event-open, .photo-button, .video-card__frame, #lightbox-prev, #lightbox-next"
+        )) return;
+        prepareAndPlay();
+      });
 
       video.addEventListener("pointerdown", () => { userPointerDown = true; }, true);
       window.addEventListener("pointerup", () => {
