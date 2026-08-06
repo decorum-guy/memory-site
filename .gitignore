@@ -7,6 +7,8 @@ Thumbs.db
 .memory-backups/
 .memory-tools/
 .memory-audit/
+.memory-imports/
+.memory-import-source/
 .memory-location-cache.json
 import/
 ORIGINALS/
@@ -18,5 +20,6 @@ package.json
 package-lock.json
 content/memories.backup-*.js
 content/memories.before-location-*.js
+content/memories.before-media-import-*.js
 __pycache__/
 *.pyc
