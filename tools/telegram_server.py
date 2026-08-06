@@ -1,24 +1,28 @@
 #!/usr/bin/env python3
-"""Local Telegram chapter constructor for Memory Site.
+"""Local constructors and safe production apply server for Memory Site.
 
 Run from repository root:
     python3 tools/telegram_server.py
 
-The server listens only on 127.0.0.1. Optional screenshots are copied to
-media/telegram and the generated chapter is written to content/telegram.js.
-Nothing is uploaded to the internet.
+The server listens only on 127.0.0.1. Optional Telegram screenshots are copied
+to media/telegram. Memory Studio may validate and apply a downloaded
+memories.js to production with an automatic local backup. Nothing is uploaded
+to the internet.
 """
 from __future__ import annotations
 
 import base64
+import datetime as dt
 import json
+import os
 import re
+import shutil
 import threading
 import uuid
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from PIL import Image
 
@@ -26,6 +30,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MEDIA_DIR = ROOT / "media" / "telegram"
 DATA_FILE = ROOT / "content" / "telegram-data.json"
 JS_FILE = ROOT / "content" / "telegram.js"
+MEMORIES_FILE = ROOT / "content" / "memories.js"
 HOST = "127.0.0.1"
 PORT = 8765
 ALLOWED = {".png", ".jpg", ".jpeg", ".webp"}
@@ -234,21 +239,93 @@ def write_state(value: Any) -> dict[str, Any]:
     return state
 
 
+def extract_memory_book_text(text: str) -> dict[str, Any]:
+    match = re.search(r"window\.MEMORY_BOOK\s*=\s*([\s\S]*);\s*$", text)
+    payload = match.group(1) if match else text
+    book = json.loads(payload)
+    if not isinstance(book, dict) or not isinstance(book.get("chapters"), list):
+        raise ValueError("неверная структура книги")
+    return book
+
+
+def iter_memory_media(value: Any) -> Iterable[dict[str, Any]]:
+    if isinstance(value, list):
+        for item in value:
+            yield from iter_memory_media(item)
+    elif isinstance(value, dict):
+        if any(key in value for key in ("src", "thumb", "poster", "liveVideo")):
+            yield value
+        for child in value.values():
+            yield from iter_memory_media(child)
+
+
+def validate_memory_paths(book: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    checked: set[str] = set()
+    for item in iter_memory_media(book):
+        for key in ("src", "thumb", "poster", "liveVideo"):
+            raw = item.get(key)
+            if not raw or str(raw) in checked:
+                continue
+            checked.add(str(raw))
+            relative = Path(str(raw))
+            if relative.is_absolute() or ".." in relative.parts:
+                errors.append(f"Небезопасный путь: {raw}")
+            elif not (ROOT / relative).is_file():
+                errors.append(f"Не найден медиафайл: {raw}")
+    return errors
+
+
+def apply_memory_book(text: str) -> dict[str, str]:
+    if not MEMORIES_FILE.is_file():
+        raise ValueError("production content/memories.js не найден")
+    book = extract_memory_book_text(text)
+    errors = validate_memory_paths(book)
+    if errors:
+        detail = "; ".join(errors[:12])
+        if len(errors) > 12:
+            detail += f"; и ещё {len(errors) - 12}"
+        raise ValueError(detail)
+
+    timestamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup = MEMORIES_FILE.with_name(f"memories.before-studio-{timestamp}.js")
+    temporary = MEMORIES_FILE.with_name(f".memories.apply-{uuid.uuid4().hex}.tmp")
+    shutil.copy2(MEMORIES_FILE, backup)
+    try:
+        temporary.write_text(text, encoding="utf-8")
+        extract_memory_book_text(temporary.read_text(encoding="utf-8"))
+        os.replace(temporary, MEMORIES_FILE)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        shutil.copy2(backup, MEMORIES_FILE)
+        raise
+
+    chapters = book.get("chapters") or []
+    first_id = str((chapters[0] if chapters else {}).get("id") or "memory-book")
+    safe_id = re.sub(r"[^A-Za-z0-9_-]", "-", first_id)
+    return {
+        "backup": backup.relative_to(ROOT).as_posix(),
+        "bookUrl": f"/index.html?opened=1#{safe_id}",
+    }
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
     def log_message(self, format: str, *args: Any) -> None:
-        print(f"[Telegram Studio] {format % args}")
+        print(f"[Memory Site] {format % args}")
 
     def end_headers(self) -> None:
         path = self.path.split("?", 1)[0]
         no_cache = (
             path.startswith("/api/telegram/")
+            or path.startswith("/api/memory/")
             or path in {
                 "/index.html",
                 "/tools/studio.html",
                 "/tools/telegram_studio.html",
+                "/content/memories.js",
                 "/content/telegram.js",
                 "/content/telegram-data.json",
             }
@@ -291,6 +368,17 @@ class Handler(SimpleHTTPRequestHandler):
                 quotes = sum(1 for block in state["blocks"] if block["type"] == "quote")
                 self.send_json({"ok": True, "blocks": len(state["blocks"]), "notes": notes, "quotes": quotes})
                 return
+            if path == "/api/memory/apply":
+                value = self.read_json()
+                name = str(value.get("name") or "memories.js")
+                if Path(name).suffix.lower() not in {".js", ".json"}:
+                    raise ValueError("Выбери memories.js или JSON-экспорт Studio")
+                text = str(value.get("text") or "")
+                if not text.strip():
+                    raise ValueError("Файл пустой")
+                result = apply_memory_book(text)
+                self.send_json({"ok": True, **result})
+                return
             self.send_json({"error": "Неизвестный endpoint"}, 404)
         except Exception as exc:
             self.send_json({"error": str(exc)}, 400)
@@ -330,12 +418,13 @@ def main() -> int:
     MEDIA_DIR.mkdir(parents=True, exist_ok=True)
     if not DATA_FILE.exists():
         write_state(DEFAULT_STATE)
-    url = f"http://{HOST}:{PORT}/tools/telegram_studio.html"
+    telegram_url = f"http://{HOST}:{PORT}/tools/telegram_studio.html"
+    memory_url = f"http://{HOST}:{PORT}/tools/studio.html"
     server = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f"Telegram Studio: {url}")
-    print("Memory Studio:  " + f"http://{HOST}:{PORT}/tools/studio.html")
+    print(f"Telegram Studio: {telegram_url}")
+    print(f"Memory Studio:  {memory_url}")
     print("Работает только локально. Для остановки нажми Ctrl+C.")
-    threading.Timer(0.7, lambda: webbrowser.open(url)).start()
+    threading.Timer(0.7, lambda: webbrowser.open(telegram_url)).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
