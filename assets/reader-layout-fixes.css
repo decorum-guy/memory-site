@@ -12,8 +12,7 @@
 
 /* Restore the accepted event-polaroid shell from media.css + round4-polish.css.
    The complete-event work must change only the surrounding layout, not shrink
-   the card or remove its paper margins. The 4:5 sheet, 18rem maximum width,
-   narrow top/side border and generous lower strip are the original design. */
+   the card or remove its paper margins. */
 .event-preview__item {
   box-sizing: border-box;
   display: block;
@@ -26,6 +25,24 @@
   display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
+}
+
+/* Global type controls exported by Memory Studio. No setting means the original
+   responsive sizes remain untouched. */
+.event-heading__date {
+  font-size: var(--memory-event-date-size, clamp(1.3rem, 3vw, 2.25rem));
+}
+.event-heading .hand-caption {
+  font-size: var(--memory-event-caption-size, 1rem);
+}
+.event-preview__caption--short {
+  font-size: var(--memory-polaroid-caption-short-size, 1.08rem);
+}
+.event-preview__caption--medium {
+  font-size: var(--memory-polaroid-caption-medium-size, .86rem);
+}
+.event-preview__caption--long {
+  font-size: var(--memory-polaroid-caption-long-size, .69rem);
 }
 
 /* Captions stay inside the original lower paper strip. They never overlap the
@@ -72,21 +89,22 @@
 }
 
 /* Every imported visual file is appended by event-page-expansion.js. Large
-   events grow vertically without a maximum height, but use three full-size
-   desktop columns so the original 18rem polaroid design is preserved. */
+   events grow vertically without a maximum height. Four desktop tracks remain,
+   while cards are deliberately wider than each track, creating the same gentle
+   overlap used by short scrapbook collages. */
 .event-layout-stack .event-preview {
   min-height: clamp(22rem, 34vw, 30rem);
   height: auto;
   max-height: none;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-auto-rows: max-content;
   align-items: start;
   align-content: start;
-  column-gap: clamp(1rem, 2.2vw, 2rem);
-  row-gap: clamp(2rem, 4vw, 3.5rem);
+  column-gap: 0;
+  row-gap: clamp(1.8rem, 3.5vw, 3rem);
   overflow: visible;
-  padding: clamp(2.5rem, 5vw, 4rem) clamp(.8rem, 2vw, 1.8rem) 4.5rem;
+  padding: clamp(2.5rem, 5vw, 4rem) clamp(.35rem, 1vw, .9rem) 4.5rem;
 }
 .event-layout-stack .event-preview::before {
   inset: 2.5rem 1.5% 2.2rem;
@@ -106,23 +124,36 @@
   right: auto;
   top: auto;
   bottom: auto;
-  width: 100%;
+  width: calc(100% + clamp(1rem, 1.7vw, 1.55rem));
   max-width: 18rem;
   justify-self: center;
-  transform: translateY(var(--event-shelf-y, 0)) rotate(var(--event-rotate));
+  z-index: var(--event-layer, 2);
+  transform: translate(var(--event-shelf-x, 0), var(--event-shelf-y, 0)) rotate(var(--event-rotate));
 }
-.event-layout-stack .event-preview__item--1 { --event-shelf-y: .45rem; }
-.event-layout-stack .event-preview__item--2 { --event-shelf-y: -.35rem; }
-.event-layout-stack .event-preview__item--3 { --event-shelf-y: .15rem; }
-.event-layout-stack .event-preview__item--4 { --event-shelf-y: -.2rem; }
-.event-layout-stack .event-preview__item--5 { --event-shelf-y: .35rem; }
-.event-layout-stack .event-preview__item--6 { --event-shelf-y: -.15rem; }
-.event-layout-stack .event-preview__item--7 { --event-shelf-y: .25rem; }
-.event-layout-stack .event-preview__item--8 { --event-shelf-y: -.3rem; }
+.event-layout-stack .event-preview__item:nth-of-type(4n + 1) {
+  --event-shelf-x: .5rem;
+  --event-shelf-y: .45rem;
+  --event-layer: 2;
+}
+.event-layout-stack .event-preview__item:nth-of-type(4n + 2) {
+  --event-shelf-x: .16rem;
+  --event-shelf-y: -.35rem;
+  --event-layer: 4;
+}
+.event-layout-stack .event-preview__item:nth-of-type(4n + 3) {
+  --event-shelf-x: -.16rem;
+  --event-shelf-y: .15rem;
+  --event-layer: 3;
+}
+.event-layout-stack .event-preview__item:nth-of-type(4n) {
+  --event-shelf-x: -.5rem;
+  --event-shelf-y: -.2rem;
+  --event-layer: 2;
+}
 .event-layout-stack .event-preview__item:hover,
 .event-layout-stack .event-preview__item:focus-visible {
   z-index: 70;
-  transform: translateY(calc(var(--event-shelf-y, 0) - .35rem)) rotate(0) scale(1.035);
+  transform: translate(var(--event-shelf-x, 0), calc(var(--event-shelf-y, 0) - .35rem)) rotate(0) scale(1.035);
 }
 
 /* The location belongs above the media, never on top of it. A dedicated shell
@@ -191,34 +222,48 @@
   transform: none;
 }
 
-/* The censor card must not collapse when app.js hides the underlying image.
-   Keep it attached to the full lightbox viewport rather than to the intrinsic
-   dimensions of the media shell. */
+/* The censor card must not collapse when app.js hides the underlying image. */
 .lightbox__censor {
   position: fixed;
   inset: 0;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 960px) {
   .event-layout-stack .event-preview {
     min-height: 40rem;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding-inline: .65rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding-inline: .35rem;
   }
-  .event-layout-stack .event-preview__item { max-width: 18rem; }
+  .event-layout-stack .event-preview__item {
+    width: calc(100% + 1rem);
+    max-width: 18rem;
+  }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .event-layout-stack .event-preview {
-    min-height: 28rem;
+    min-height: 34rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.6rem 0;
+    padding: 2rem .15rem 3.8rem;
+  }
+  .event-layout-stack .event-preview__item {
+    width: calc(100% + .6rem);
+    max-width: 16rem;
+  }
+}
+
+@media (max-width: 460px) {
+  .event-layout-stack .event-preview {
     grid-template-columns: minmax(0, 1fr);
     gap: 2.2rem;
-    padding: 2rem .2rem 3.8rem;
   }
   .event-layout-stack .event-preview__item {
     width: min(100%, 16rem);
-    max-width: 16rem;
   }
+}
+
+@media (max-width: 600px) {
   .event-preview__caption,
   .event-preview__caption--short,
   .event-preview__caption--medium,
