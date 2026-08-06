@@ -13,12 +13,24 @@
     function enforceVisibleEventOrder() {
       const rotations = [-1.8, 1.35, -.9, 1.7, 1.05, -1.4, .75, -1.1];
       document.querySelectorAll(".memory-block--event .event-preview").forEach((preview) => {
-        [...preview.querySelectorAll(".event-preview__item")].forEach((card, index) => {
+        const countBadge = preview.querySelector(".event-preview__count");
+        const cards = [...preview.querySelectorAll(".event-preview__item")];
+        cards.sort((left, right) => sourceIndex(left) - sourceIndex(right));
+        cards.forEach((card, index) => {
           card.dataset.mediaOrder = String(index);
           card.style.order = String(index);
           card.style.setProperty("--event-ordered-rotate", `${rotations[index % rotations.length]}deg`);
+          preview.insertBefore(card, countBadge || null);
         });
       });
+
+      function sourceIndex(card) {
+        const instanceKey = card.querySelector(".image-frame")?.dataset.mediaInstanceKey || "";
+        const match = instanceKey.match(/::(\d+)$/);
+        if (match) return Number(match[1]);
+        const fallback = Number(card.dataset.mediaOrder);
+        return Number.isFinite(fallback) ? fallback : Number.MAX_SAFE_INTEGER;
+      }
     }
 
     function alignLocationBadge() {
