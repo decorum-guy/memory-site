@@ -32,7 +32,7 @@
         const icon = document.createElement("span");
         icon.className = "lightbox__location-icon";
         icon.setAttribute("aria-hidden", "true");
-        icon.textContent = "⌖";
+        icon.textContent = "⌖ ";
         const text = document.createElement("span");
         text.className = "lightbox__location-text";
         text.textContent = raw;
