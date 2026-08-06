@@ -73,7 +73,7 @@
         ...(Array.isArray(block?.items) ? block.items.map((item) => item?.takenAt || item?.date) : []),
       ];
       for (const candidate of candidates) {
-        const match = String(candidate || "").match(/\b(\d{4}-\d{2}-\d{2})\b/);
+        const match = String(candidate || "").match(/(\d{4}-\d{2}-\d{2})/);
         if (match) return match[1];
       }
       return String(block?.title || block?.id || "event")
