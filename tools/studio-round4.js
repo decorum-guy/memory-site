@@ -3,6 +3,7 @@
   installStudioTabs();
   installProductionApply();
   installIncrementalMediaImportAssets();
+  installCropBoundsAssets();
 
   const baseNormalizeBook = normalizeBook;
   normalizeBook = function round4NormalizeBook() {
@@ -106,20 +107,16 @@
       const fallback = Number(cropSession?.item?.duration);
       return Number.isFinite(fallback) && fallback > 0 ? fallback : Number(frameRange.max) || 0;
     };
-
     const maxSelectableTime = () => {
       const duration = mediaDuration();
       return Math.max(0, duration > .001 ? duration - .001 : duration);
     };
-
     const safeTime = (value) => clamp(Number(value), 0, maxSelectableTime());
-
     const paintTime = (value) => {
       const safe = Number.isFinite(value) ? value : 0;
       frameRange.value = String(safe);
       frameCurrent.textContent = formatPreciseTime(safe);
     };
-
     const issueSeek = (value) => {
       if (!metadataReady || frameView.hidden || !frameVideo.currentSrc) return;
       const target = safeTime(value);
@@ -131,7 +128,7 @@
         requestAnimationFrame(() => {
           if (!pendingSeek || pendingSeek.serial !== serial || !metadataReady || frameView.hidden) return;
           try { frameVideo.currentTime = pendingSeek.target; }
-          catch (_) { /* the browser will retry on the next metadata/seek event */ }
+          catch (_) { /* retry after metadata */ }
         });
       }
     };
@@ -150,7 +147,6 @@
       frameRange.max = String(Math.max(.04, duration));
       frameDuration.textContent = formatPreciseTime(duration);
       metadataReady = true;
-
       const source = frameVideo.currentSrc || frameVideo.src;
       if (source !== initializedSource) {
         initializedSource = source;
@@ -164,7 +160,6 @@
     syncFramePickerTime = function stableSyncFramePickerTime(mediaEvent) {
       if (!cropSession || frameView.hidden || !metadataReady) return;
       const current = Number.isFinite(frameVideo.currentTime) ? frameVideo.currentTime : 0;
-
       if (pendingSeek) {
         const target = pendingSeek.target;
         if (Math.abs(current - target) <= seekTolerance) {
@@ -172,13 +167,10 @@
           pendingSeek = null;
           paintTime(draftTime);
         } else if (mediaEvent?.type === "seeked") {
-          // A rapid second drag can finish an older seek after a newer target was
-          // selected. Reapply only the latest target and ignore the stale event.
           issueSeek(target);
         }
         return;
       }
-
       draftTime = safeTime(current);
       paintTime(draftTime);
     };
@@ -242,19 +234,16 @@
     const top = document.querySelector(".top");
     const exportButton = document.getElementById("export");
     if (!top || !exportButton || document.getElementById("apply-production-file") || testMode) return;
-
     const label = document.createElement("label");
     label.className = "studio-apply-production";
     label.innerHTML = `Применить в production<input id="apply-production-file" type="file" accept=".js,.json" />`;
     exportButton.insertAdjacentElement("afterend", label);
-
     const guide = document.querySelector(".button-guide dl");
     if (guide) {
       const row = document.createElement("div");
       row.innerHTML = `<dt>Применить в production</dt><dd>Выбирает скачанный memories.js, делает резервную копию, проверяет медиа и сразу открывает обновлённую книгу.</dd>`;
       guide.appendChild(row);
     }
-
     label.querySelector("input").addEventListener("change", applyProductionFile);
   }
 
@@ -267,6 +256,15 @@
     document.head.appendChild(script);
   }
 
+  function installCropBoundsAssets() {
+    if (document.querySelector('script[data-studio-crop-bounds]')) return;
+    const script = document.createElement("script");
+    script.src = "studio-crop-bounds.js";
+    script.dataset.studioCropBounds = "1";
+    script.defer = true;
+    document.head.appendChild(script);
+  }
+
   async function applyProductionFile(fileEvent) {
     const input = fileEvent.target;
     const file = input.files?.[0];
@@ -275,7 +273,6 @@
       input.value = "";
       return;
     }
-
     let parsed;
     let previewWindow = null;
     try {
@@ -294,22 +291,18 @@
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
-
       snapshot();
       book = parsed;
       normalizeBook();
       render();
       status.textContent = `Production обновлён. Резервная копия: ${result.backup || "создана"}`;
-
       const target = new URL(result.bookUrl || "../index.html?opened=1", location.href);
       target.searchParams.set("v", String(Date.now()));
       if (previewWindow && !previewWindow.closed) previewWindow.location.replace(target.href);
       else window.open(target.href, "_blank");
     } catch (error) {
       if (previewWindow && !previewWindow.closed) previewWindow.close();
-      const localHint = location.protocol === "file:"
-        ? " Открой Studio через python3 tools/memory_server.py, а не как file://."
-        : "";
+      const localHint = location.protocol === "file:" ? " Открой Studio через python3 tools/memory_server.py, а не как file://." : "";
       status.textContent = `Не удалось применить файл: ${error.message}.${localHint}`;
       alert(`Не удалось применить memories.js: ${error.message}.${localHint}`);
     } finally {
@@ -320,9 +313,7 @@
   function parseMemoryText(text) {
     const match = String(text || "").match(/window\.MEMORY_BOOK\s*=\s*([\s\S]*);\s*$/);
     const parsed = JSON.parse(match ? match[1] : text);
-    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.chapters)) {
-      throw new Error("неверная структура книги");
-    }
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.chapters)) throw new Error("неверная структура книги");
     return parsed;
   }
 
