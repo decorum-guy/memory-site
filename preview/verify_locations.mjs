@@ -36,13 +36,14 @@ try {
     })
   );
   assert(stackRects.length === 5, "Large event fixture does not contain five cards");
-  const firstRow = stackRects.slice(0, 4);
+  const firstRow = stackRects.slice(0, 3);
   const distinctColumns = new Set(firstRow.map((rect) => Math.round(rect.left / 25))).size;
   const horizontalSpan = Math.max(...firstRow.map((rect) => rect.right)) - Math.min(...firstRow.map((rect) => rect.left));
-  assert(distinctColumns === 4, `Large event does not expose four readable desktop columns: ${JSON.stringify(stackRects)}`);
-  assert(horizontalSpan > 650, `Large event preview is still too compressed: ${horizontalSpan}px`);
-  assert(stackRects[4].top > Math.min(...firstRow.map((rect) => rect.bottom)),
-    `The fifth card did not start a new growing row: ${JSON.stringify(stackRects)}`);
+  assert(distinctColumns === 3, `Large event does not expose three full-size desktop columns: ${JSON.stringify(stackRects)}`);
+  assert(horizontalSpan > 850, `Full-size event preview is too compressed: ${horizontalSpan}px`);
+  assert(firstRow.every((rect) => rect.width >= 280), `Desktop polaroids are smaller than the accepted design: ${JSON.stringify(stackRects)}`);
+  assert(stackRects[3].top > Math.min(...firstRow.map((rect) => rect.bottom)),
+    `The fourth card did not start a new growing row: ${JSON.stringify(stackRects)}`);
 
   await page.locator("#ordinary-days").scrollIntoViewIfNeeded();
   await page.locator('[data-media-key="d01"]').click();
@@ -116,7 +117,7 @@ try {
 
   console.log(JSON.stringify({
     stableChapterPages: true,
-    readableGrowingEventGrid: true,
+    fullSizeGrowingEventGrid: true,
     fullscreenLocation: true,
     locationAboveMedia: true,
     missingLocationHidden: true,
