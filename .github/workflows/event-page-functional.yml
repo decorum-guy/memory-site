@@ -40,6 +40,8 @@ jobs:
       - name: Prepare thirteen-item event fixture
         run: |
           python -m pip install --disable-pip-version-check pillow
+          mkdir -p preview/demo-media
+          cp preview/screenshots/01-cover-desktop.png preview/demo-media/photo-01.jpg
           python3 - <<'PY'
           from pathlib import Path
           import json
