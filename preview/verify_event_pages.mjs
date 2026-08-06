@@ -18,13 +18,33 @@ try {
   const previewBox = await event.locator(".event-preview").boundingBox();
   assert(firstBox && lastBox && previewBox, "Event geometry is unavailable");
   assert(lastBox.y > firstBox.y + firstBox.height, "All cards stayed in one row instead of growing the event vertically");
-  assert(previewBox.height > firstBox.height * 3, "Event preview did not grow for all rows");
+  assert(previewBox.height > firstBox.height * 4, "Event preview did not grow for all full-size rows");
 
   const firstCard = cards.nth(0);
   const caption = firstCard.locator(".event-preview__caption");
   const cardBox = await firstCard.boundingBox();
+  const frameBox = await firstCard.locator(".image-frame").boundingBox();
   const captionBox = await caption.boundingBox();
-  assert(cardBox && captionBox, "Caption geometry is unavailable");
+  assert(cardBox && frameBox && captionBox, "Polaroid geometry is unavailable");
+
+  const cardState = await firstCard.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      aspectRatio: style.aspectRatio,
+      paddingTop: parseFloat(style.paddingTop),
+      paddingRight: parseFloat(style.paddingRight),
+      paddingBottom: parseFloat(style.paddingBottom),
+      width: node.getBoundingClientRect().width,
+      height: node.getBoundingClientRect().height,
+    };
+  });
+  assert(cardState.aspectRatio === "4 / 5", `Original 4:5 polaroid proportion was lost: ${JSON.stringify(cardState)}`);
+  assert(cardState.width >= 260, `Desktop polaroid became too small: ${JSON.stringify(cardState)}`);
+  assert(cardState.paddingTop >= 8 && cardState.paddingRight >= 8, `Top/side paper margin collapsed: ${JSON.stringify(cardState)}`);
+  assert(cardState.paddingBottom >= 40, `Lower white paper strip collapsed: ${JSON.stringify(cardState)}`);
+  assert(frameBox.x >= cardBox.x + 7 && frameBox.y >= cardBox.y + 7, "Photo touches the top or side card edge");
+  assert(cardBox.y + cardBox.height - (frameBox.y + frameBox.height) >= 60, "White lower polaroid area is no longer visible");
+
   assert(captionBox.x >= cardBox.x, "Caption escapes the left card edge");
   assert(captionBox.x + captionBox.width <= cardBox.x + cardBox.width, "Caption escapes the right card edge");
 
@@ -36,7 +56,6 @@ try {
       lineClamp: style.webkitLineClamp,
       overflowWrap: style.overflowWrap,
       overflow: style.overflow,
-      marginTop: parseFloat(style.marginTop),
       clientHeight: node.clientHeight,
       scrollHeight: node.scrollHeight,
       width: node.getBoundingClientRect().width,
@@ -46,7 +65,6 @@ try {
     };
   });
   assert(captionState.captionTop >= captionState.frameBottom + 4, "Caption overlaps the photo or has no upper gap");
-  assert(captionState.marginTop >= 4, "Caption has no visible upper spacing");
   assert(captionState.whiteSpace === "normal", "Caption is still forced into one line");
   assert(captionState.lineClamp === "4", `Expected four-line clamp, got ${captionState.lineClamp}`);
   assert(["anywhere", "break-word"].includes(captionState.overflowWrap), "Long words cannot wrap inside the caption");
@@ -66,6 +84,8 @@ try {
   console.log(JSON.stringify({
     renderedCards: 13,
     multiRowHeight: true,
+    originalPolaroidSize: true,
+    originalPaperMargins: true,
     captionBelowMedia: true,
     captionFourLineClamp: true,
     lastCardOpensCorrectItem: true,
