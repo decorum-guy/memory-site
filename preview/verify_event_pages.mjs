@@ -120,13 +120,30 @@ try {
   const applyPath = resolve("preview/.memory-apply-test.js");
   await writeFile(applyPath, exported, "utf8");
   studio.on("dialog", (dialog) => dialog.accept());
+  let applyResponse = null;
+  studio.on("response", async (response) => {
+    if (!response.url().endsWith("/api/memory/apply")) return;
+    applyResponse = {
+      status: response.status(),
+      body: await response.text().catch(() => "<unreadable>")
+    };
+  });
   const popupPromise = studio.waitForEvent("popup");
   await studio.locator("#apply-production-file").setInputFiles(applyPath);
   const popup = await popupPromise;
-  await studio.locator("#status").filter({ hasText: "Production обновлён" }).waitFor({ state: "visible", timeout: 15000 });
+  await studio.waitForFunction(() => {
+    const text = document.getElementById("status")?.textContent || "";
+    return text.includes("Production обновлён") || text.includes("Не удалось применить");
+  }, null, { timeout: 15000 });
+  const applyStatus = (await studio.locator("#status").textContent()) || "";
+  assert(applyStatus.includes("Production обновлён"), `Production apply failed: ${applyStatus}; response=${JSON.stringify(applyResponse)}`);
   await popup.waitForLoadState("networkidle");
-  const appliedSize = await popup.evaluate(() => window.MEMORY_BOOK?.meta?.typography?.eventCaptionPx);
-  assert(appliedSize === 22, `Applied production book lost typography settings: ${appliedSize}`);
+  const appliedState = await popup.evaluate(() => ({
+    value: window.MEMORY_BOOK?.meta?.typography?.eventCaptionPx,
+    computed: parseFloat(getComputedStyle(document.querySelector(".event-heading .hand-caption")).fontSize)
+  }));
+  assert(appliedState.value === 22, `Applied production book lost typography settings: ${JSON.stringify(appliedState)}`);
+  assert(Math.abs(appliedState.computed - 22) < .5, `Reader did not apply typography CSS: ${JSON.stringify(appliedState)}`);
   await popup.close();
   await studio.close();
   await unlink(applyPath).catch(() => {});
