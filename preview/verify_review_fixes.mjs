@@ -90,6 +90,12 @@ try {
   const hoverZ = Number(await cards.nth(8).evaluate((node) => getComputedStyle(node).zIndex));
   assert(hoverZ > countZ, `Hovered card stays below file-count badge: ${hoverZ} <= ${countZ}`);
 
+  await cards.nth(8).click();
+  await page.locator("#lightbox-counter").waitFor({ state: "visible" });
+  assert((await page.locator("#lightbox-counter").textContent())?.trim() === "9 / 9",
+    `Ninth preview opened the wrong gallery item: ${await page.locator("#lightbox-counter").textContent()}`);
+  await page.locator("#lightbox-close").click();
+
   await cards.nth(0).click();
   const video = page.locator("#lightbox-video");
   await video.waitFor({ state: "visible" });
@@ -166,6 +172,7 @@ try {
   console.log(JSON.stringify({
     legacyNineItemCollagePromoted: true,
     ninthCardVisible: true,
+    ninthCardOpensNinthItem: true,
     hoveredCardAboveCount: true,
     sourceOrderPreserved: true,
     scrapbookTiltsPreserved: true,
