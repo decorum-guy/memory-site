@@ -1,4 +1,4 @@
-name: Crop editor, cursor and Telegram functional verification
+name: Crop editor, cursor and For You functional verification
 
 on:
   workflow_dispatch:
@@ -22,6 +22,7 @@ on:
       - "tools/studio-round4.css"
       - "tools/studio-round4.js"
       - "tools/telegram_server.py"
+      - "tools/memory_server.py"
       - "tools/telegram_studio.html"
       - "preview/demo_memories.js"
       - "preview/demo_telegram.js"
@@ -49,35 +50,34 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Validate Telegram builder
+      - name: Validate For You builder
         run: |
           python -m pip install --disable-pip-version-check Pillow
-          python -m py_compile tools/telegram_server.py tools/import_memories.py
+          python -m py_compile tools/telegram_server.py tools/memory_server.py tools/import_memories.py
           python - <<'PY'
-          import importlib.util
+          import sys
           from pathlib import Path
-          spec = importlib.util.spec_from_file_location("telegram_server", Path("tools/telegram_server.py"))
-          module = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(module)
-          state = module.normalize_state({
+          sys.path.insert(0, str(Path("tools").resolve()))
+          import memory_server
+
+          state = memory_server.base.normalize_state({
               "kicker": "Редактируемая фраза",
-              "title": "Test",
-              "subtitle": "Test",
+              "title": "For You",
+              "subtitle": "Пожелания рядом",
               "blocks": [
-                  {"type": "note", "text": "Напутствие", "shape": 4, "layout": "left"},
-                  {"type": "quote", "text": "Сообщение Сони", "speaker": "sonya", "screenshot": "media/telegram/test.png"},
-                  {"type": "quote", "text": "Сообщение Артёма", "speaker": "me"},
+                  {"type": "note", "text": "Первое пожелание", "shape": 4, "layout": "left"},
+                  {"type": "note", "text": "Второе пожелание", "shape": 2, "layout": "right"},
               ],
           })
-          modes, chapter = module.build_chapter(state)
+          modes, chapter = memory_server.base.build_chapter(state)
           assert chapter["kicker"] == "Редактируемая фраза"
+          assert chapter["title"] == "For You"
+          assert chapter["number"] == "FY"
           assert chapter["blocks"][0]["layout"] == "left"
-          assert [block["telegramKind"] for block in chapter["blocks"]] == ["note", "message", "message"]
-          assert chapter["blocks"][1]["speaker"] == "sonya"
-          assert chapter["blocks"][2]["speaker"] == "me"
-          assert chapter["blocks"][1]["screenshot"] == "media/telegram/test.png"
-          assert modes["media/telegram/test.png"] == "paper"
-          print("Telegram builder: OK")
+          assert chapter["blocks"][1]["layout"] == "right"
+          assert [block["telegramKind"] for block in chapter["blocks"]] == ["note", "note"]
+          assert modes == {}
+          print("For You builder: OK")
           PY
 
       - name: Generate demo media
@@ -115,7 +115,7 @@ jobs:
           from pathlib import Path
           import re
           for source, target in [
-              ("tools/telegram_studio.html", "/tmp/telegram-studio.js"),
+              ("tools/telegram_studio.html", "/tmp/for-you-studio.js"),
               ("tools/studio.html", "/tmp/memory-studio.js"),
           ]:
               text = Path(source).read_text(encoding="utf-8")
@@ -124,7 +124,7 @@ jobs:
               assert inline, f"Inline script not found in {source}"
               Path(target).write_text(inline, encoding="utf-8")
           PY
-          node --check /tmp/telegram-studio.js
+          node --check /tmp/for-you-studio.js
           node --check /tmp/memory-studio.js
 
       - name: Install Chromium
@@ -145,16 +145,16 @@ jobs:
           node preview/verify_round4.mjs
           node preview/verify_crop_editor.mjs
 
-      - name: Run Telegram Studio end-to-end verification
+      - name: Run For You Studio end-to-end verification
         run: |
           rm -f content/telegram-data.json
-          python tools/telegram_server.py >/tmp/telegram-studio-server.log 2>&1 &
+          python tools/memory_server.py >/tmp/for-you-studio-server.log 2>&1 &
           for attempt in {1..30}; do
             curl --fail --silent http://127.0.0.1:8765/api/telegram/state >/dev/null && break
             sleep 1
           done
           curl --fail --silent http://127.0.0.1:8765/api/telegram/state >/dev/null || {
-            cat /tmp/telegram-studio-server.log
+            cat /tmp/for-you-studio-server.log
             exit 1
           }
           node preview/verify_telegram_studio.mjs
