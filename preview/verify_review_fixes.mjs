@@ -15,6 +15,10 @@ try {
   await event.scrollIntoViewIfNeeded();
   const cards = event.locator(".event-preview__item");
   assert(await cards.count() === 9, `Expected nine ordered cards, got ${await cards.count()}`);
+  assert(await event.evaluate((node) => node.classList.contains("event-layout-stack")),
+    "A 9-item legacy collage was not promoted to the growing stack grid");
+  assert(!await event.evaluate((node) => node.classList.contains("event-layout-collage")),
+    "Legacy collage class remained on a 9-item event");
 
   const order = await cards.evaluateAll((nodes) => nodes.map((node) => ({
     order: Number(node.dataset.mediaOrder),
@@ -43,16 +47,44 @@ try {
   assert(scrapbook.every((entry) => entry.transform !== "none"),
     `Card transforms are not applied: ${JSON.stringify(scrapbook)}`);
 
-  const geometry = await cards.evaluateAll((nodes) => nodes.slice(0, 5).map((node) => {
+  const geometry = await cards.evaluateAll((nodes) => nodes.map((node) => {
     const rect = node.getBoundingClientRect();
-    return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    const style = getComputedStyle(node);
+    return {
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height,
+      display: style.display,
+      visibility: style.visibility,
+      opacity: Number(style.opacity),
+    };
   }));
+  assert(geometry.every((rect) => rect.width > 100 && rect.height > 100 && rect.display !== "none" && rect.visibility !== "hidden" && rect.opacity > 0),
+    `One or more cards are not visibly rendered: ${JSON.stringify(geometry)}`);
   assert(geometry.slice(0, 4).every((rect, index, row) => index === 0 || rect.left > row[index - 1].left),
     `First row is not left-to-right: ${JSON.stringify(geometry)}`);
+  assert(geometry.slice(4, 8).every((rect, index, row) => index === 0 || rect.left > row[index - 1].left),
+    `Second row is not left-to-right: ${JSON.stringify(geometry)}`);
   assert(geometry[4].top > Math.min(...geometry.slice(0, 4).map((rect) => rect.bottom)),
     `Fifth item did not start the second row: ${JSON.stringify(geometry)}`);
+  assert(geometry[8].top > Math.min(...geometry.slice(4, 8).map((rect) => rect.bottom)),
+    `Ninth item did not start a visible third row: ${JSON.stringify(geometry)}`);
+
+  const previewGeometry = await event.locator(".event-preview").evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    return { top: rect.top, bottom: rect.bottom, height: rect.height };
+  });
+  assert(previewGeometry.bottom >= geometry[8].bottom - 16,
+    `Growing preview clips the ninth card: ${JSON.stringify({ previewGeometry, ninth: geometry[8] })}`);
+
+  const centers = geometry.map((rect) => `${Math.round((rect.left + rect.right) / 2)}:${Math.round((rect.top + rect.bottom) / 2)}`);
+  assert(new Set(centers).size === 9, `Two cards still occupy the same slot: ${JSON.stringify(centers)}`);
 
   const count = event.locator(".event-preview__count");
+  assert((await count.textContent())?.trim() === "9 файлов", `Wrong count badge: ${await count.textContent()}`);
   const countZ = Number(await count.evaluate((node) => getComputedStyle(node).zIndex));
   await cards.nth(8).hover();
   const hoverZ = Number(await cards.nth(8).evaluate((node) => getComputedStyle(node).zIndex));
@@ -132,6 +164,8 @@ try {
   assert((await range.arrayBuffer()).byteLength === 64, "Partial media response has wrong length");
 
   console.log(JSON.stringify({
+    legacyNineItemCollagePromoted: true,
+    ninthCardVisible: true,
     hoveredCardAboveCount: true,
     sourceOrderPreserved: true,
     scrapbookTiltsPreserved: true,
