@@ -21,29 +21,32 @@ try {
   assert(previewBox.height > firstBox.height * 3, "Event preview did not grow for all rows");
 
   const firstCard = cards.nth(0);
-  const frame = firstCard.locator(".image-frame");
   const caption = firstCard.locator(".event-preview__caption");
-  const frameBox = await frame.boundingBox();
-  const captionBox = await caption.boundingBox();
   const cardBox = await firstCard.boundingBox();
-  assert(frameBox && captionBox && cardBox, "Caption geometry is unavailable");
-  assert(captionBox.y >= frameBox.y + frameBox.height + 4, "Caption overlaps the photo or has no upper gap");
+  const captionBox = await caption.boundingBox();
+  assert(cardBox && captionBox, "Caption geometry is unavailable");
   assert(captionBox.x >= cardBox.x, "Caption escapes the left card edge");
   assert(captionBox.x + captionBox.width <= cardBox.x + cardBox.width, "Caption escapes the right card edge");
 
   const captionState = await caption.evaluate((node) => {
     const style = getComputedStyle(node);
+    const frame = node.parentElement.querySelector(".image-frame");
     return {
       whiteSpace: style.whiteSpace,
       lineClamp: style.webkitLineClamp,
       overflowWrap: style.overflowWrap,
       overflow: style.overflow,
+      marginTop: parseFloat(style.marginTop),
       clientHeight: node.clientHeight,
       scrollHeight: node.scrollHeight,
       width: node.getBoundingClientRect().width,
       cardWidth: node.closest(".event-preview__item").getBoundingClientRect().width,
+      frameBottom: frame.offsetTop + frame.offsetHeight,
+      captionTop: node.offsetTop,
     };
   });
+  assert(captionState.captionTop >= captionState.frameBottom + 4, "Caption overlaps the photo or has no upper gap");
+  assert(captionState.marginTop >= 4, "Caption has no visible upper spacing");
   assert(captionState.whiteSpace === "normal", "Caption is still forced into one line");
   assert(captionState.lineClamp === "4", `Expected four-line clamp, got ${captionState.lineClamp}`);
   assert(["anywhere", "break-word"].includes(captionState.overflowWrap), "Long words cannot wrap inside the caption");
