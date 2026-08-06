@@ -64,7 +64,7 @@ try {
     const captions = [...document.querySelectorAll(".event-preview__caption")];
     if (captions.length < 2) throw new Error("Not enough event captions for adaptive-size verification");
     captions[0].textContent = "Кино";
-    captions[1].textContent = "Очень длинная подпись к фотографии, которая обязательно должна стать компактнее и обрезаться";
+    captions[1].textContent = "Очень длинная подпись к фотографии, которая обязательно должна стать компактнее, переноситься внутри нижней полоски, не залезать на изображение и после четвёртой строки аккуратно обрезаться с многоточием";
     window.MEMORY_ROUND4.classifyPolaroidCaptions();
   });
   const shortCaption = page.locator(".event-preview__caption").nth(0);
@@ -74,15 +74,35 @@ try {
   const shortSize = parseFloat(await shortCaption.evaluate((node) => getComputedStyle(node).fontSize));
   const longSize = parseFloat(await longCaption.evaluate((node) => getComputedStyle(node).fontSize));
   assert(shortSize > longSize, `Adaptive caption sizes are reversed: ${shortSize} <= ${longSize}`);
-  const longOverflow = await longCaption.evaluate((node) => ({
-    overflow: getComputedStyle(node).overflow,
-    textOverflow: getComputedStyle(node).textOverflow,
-    whiteSpace: getComputedStyle(node).whiteSpace,
-  }));
-  assert(longOverflow.overflow === "hidden" && longOverflow.textOverflow === "ellipsis" && longOverflow.whiteSpace === "nowrap", `Long caption is not safely truncated: ${JSON.stringify(longOverflow)}`);
-  const captionBottom = parseFloat(await longCaption.evaluate((node) => getComputedStyle(node).bottom));
-  const lineBottom = parseFloat(await longCaption.evaluate((node) => getComputedStyle(node.closest("button"), "::after").bottom));
-  assert(captionBottom > lineBottom, `Caption is not above the decorative line: ${captionBottom} <= ${lineBottom}`);
+  const longOverflow = await longCaption.evaluate((node) => {
+    const style = getComputedStyle(node);
+    const frame = node.parentElement.querySelector(".image-frame");
+    const card = node.closest("button");
+    return {
+      overflow: style.overflow,
+      textOverflow: style.textOverflow,
+      whiteSpace: style.whiteSpace,
+      lineClamp: style.webkitLineClamp,
+      overflowWrap: style.overflowWrap,
+      clientHeight: node.clientHeight,
+      scrollHeight: node.scrollHeight,
+      captionTop: node.offsetTop,
+      frameBottom: frame.offsetTop + frame.offsetHeight,
+      captionWidth: node.getBoundingClientRect().width,
+      cardWidth: card.getBoundingClientRect().width,
+    };
+  });
+  assert(
+    longOverflow.overflow === "hidden"
+      && longOverflow.textOverflow === "ellipsis"
+      && longOverflow.whiteSpace === "normal"
+      && longOverflow.lineClamp === "4",
+    `Long caption is not safely wrapped and clamped: ${JSON.stringify(longOverflow)}`
+  );
+  assert(["anywhere", "break-word"].includes(longOverflow.overflowWrap), `Long words cannot wrap: ${JSON.stringify(longOverflow)}`);
+  assert(longOverflow.captionTop >= longOverflow.frameBottom + 4, `Caption overlaps the photograph: ${JSON.stringify(longOverflow)}`);
+  assert(longOverflow.scrollHeight > longOverflow.clientHeight, `Long caption fixture did not reach the four-line clamp: ${JSON.stringify(longOverflow)}`);
+  assert(longOverflow.captionWidth <= longOverflow.cardWidth * .8, `Caption exceeds the decorative rule width: ${JSON.stringify(longOverflow)}`);
 
   await page.locator("#journeys").scrollIntoViewIfNeeded();
   await page.locator('[data-media-key="t05"]').click();
@@ -139,6 +159,7 @@ try {
     censorshipWithoutScroll: true,
     censorshipIndicatorCentered: true,
     adaptiveCaptions: true,
+    fourLineCaptionClamp: true,
     liveSound: true,
     studioTabs: true,
     editableBookMetadataExport: true,
