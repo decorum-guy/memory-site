@@ -36,6 +36,33 @@ try {
   assert(cardRects[4].top > Math.min(...firstRow.map((rect) => rect.bottom)), "The fifth card did not start a second row");
   assert(previewBox.height > firstRow[0].height * 3, "Event preview did not grow for all four rows");
 
+  const seededLayout = await page.evaluate(() => {
+    const api = window.MEMORY_EVENT_LAYOUT;
+    if (!api) throw new Error("Date-seeded layout API is missing");
+    const preview = document.querySelector(".memory-block--event .event-preview");
+    const nodes = [...preview.querySelectorAll(".event-preview__item")].slice(0, 4);
+    const readNode = (node) => ({
+      rotate: Number.parseFloat(node.style.getPropertyValue("--event-rotate")),
+      x: Number.parseFloat(node.style.getPropertyValue("--event-shelf-x")),
+      y: Number.parseFloat(node.style.getPropertyValue("--event-shelf-y")),
+      layer: Number.parseInt(node.style.getPropertyValue("--event-layer"), 10),
+    });
+    const sameDateA = Array.from({ length: 4 }, (_, index) => api.cardLayout("2026-07-10", index));
+    const sameDateB = Array.from({ length: 4 }, (_, index) => api.cardLayout("2026-07-10", index));
+    const otherDate = Array.from({ length: 4 }, (_, index) => api.cardLayout("2026-07-11", index));
+    return {
+      seed: preview.dataset.eventDateSeed,
+      dom: nodes.map(readNode),
+      sameDateA,
+      sameDateB,
+      otherDate,
+    };
+  });
+  assert(seededLayout.seed === "2026-07-10", `Event seed was not derived from its date: ${JSON.stringify(seededLayout)}`);
+  assert(JSON.stringify(seededLayout.sameDateA) === JSON.stringify(seededLayout.sameDateB), "The same event date changes its layout between calculations");
+  assert(JSON.stringify(seededLayout.sameDateA) !== JSON.stringify(seededLayout.otherDate), "Different event dates received an identical layout");
+  assert(JSON.stringify(seededLayout.dom) === JSON.stringify(seededLayout.sameDateA), `Rendered cards do not use the date seed: ${JSON.stringify(seededLayout)}`);
+
   const firstCard = cards.nth(0);
   const caption = firstCard.locator(".event-preview__caption");
   const cardBox = await firstCard.boundingBox();
@@ -151,6 +178,9 @@ try {
   console.log(JSON.stringify({
     renderedCards: 13,
     overlappingFourCardRows: true,
+    dateSeededLayout: true,
+    stableSameDateLayout: true,
+    differentDatesDiffer: true,
     originalPolaroidSize: true,
     originalPaperMargins: true,
     captionBelowMedia: true,
