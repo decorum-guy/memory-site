@@ -11,7 +11,6 @@
     installRegularVideoPlayback();
 
     function enforceVisibleEventOrder() {
-      const rotations = [-1.8, 1.35, -.9, 1.7, 1.05, -1.4, .75, -1.1];
       document.querySelectorAll(".memory-block--event .event-preview").forEach((preview) => {
         const countBadge = preview.querySelector(".event-preview__count");
         const cards = [...preview.querySelectorAll(".event-preview__item")];
@@ -19,7 +18,6 @@
         cards.forEach((card, index) => {
           card.dataset.mediaOrder = String(index);
           card.style.order = String(index);
-          card.style.setProperty("--event-ordered-rotate", `${rotations[index % rotations.length]}deg`);
           preview.insertBefore(card, countBadge || null);
         });
       });
