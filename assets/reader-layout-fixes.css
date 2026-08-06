@@ -1,0 +1,155 @@
+/* Reader layout corrections after production import review.
+   Loaded last so these rules intentionally win over decorative legacy layers. */
+
+/* A year chapter can be tens of thousands of pixels tall. Rotating the entire
+   element causes its bottom edge and all media to drift horizontally. Keep the
+   real sheet level; the already-rotated ::before/::after paper layers retain
+   the handmade scrapbook feeling without moving the content. */
+.memory-page:nth-child(even),
+.memory-page:nth-child(odd) {
+  transform: none;
+}
+
+/* Imported events with 9+ items are marked as "stack". The previous layout put
+   five previews at virtually the same centre point. Keep five representative
+   cards, but expose each one in a readable shelf so every preview is clickable. */
+.event-layout-stack .event-preview {
+  min-height: clamp(20rem, 31vw, 27rem);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: center;
+  gap: clamp(.55rem, 1.2vw, 1rem);
+  padding: clamp(2.2rem, 5vw, 4rem) clamp(.5rem, 1.5vw, 1.5rem) 3.7rem;
+}
+.event-layout-stack .event-preview::before {
+  inset: 8% 1.5% 6%;
+}
+.event-layout-stack .event-preview__item,
+.event-layout-stack .event-preview__item--1,
+.event-layout-stack .event-preview__item--2,
+.event-layout-stack .event-preview__item--3,
+.event-layout-stack .event-preview__item--4,
+.event-layout-stack .event-preview__item--5 {
+  position: relative;
+  inset: auto;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  width: 100%;
+  max-width: 13rem;
+  justify-self: center;
+  transform: translateY(var(--event-shelf-y, 0)) rotate(var(--event-rotate));
+}
+.event-layout-stack .event-preview__item--1 { --event-shelf-y: .7rem; }
+.event-layout-stack .event-preview__item--2 { --event-shelf-y: -.65rem; }
+.event-layout-stack .event-preview__item--3 { --event-shelf-y: .25rem; }
+.event-layout-stack .event-preview__item--4 { --event-shelf-y: -.4rem; }
+.event-layout-stack .event-preview__item--5 { --event-shelf-y: .6rem; }
+.event-layout-stack .event-preview__item:hover,
+.event-layout-stack .event-preview__item:focus-visible {
+  z-index: 70;
+  transform: translateY(calc(var(--event-shelf-y, 0) - .35rem)) rotate(0) scale(1.045);
+}
+
+/* The location belongs above the media, never on top of it. A dedicated shell
+   keeps the badge aligned with the media edge and separates media, metadata and
+   Live Photo controls into independent rows. */
+.lightbox__figure {
+  width: min(100%, 1100px);
+  max-width: min(100%, 1100px);
+  max-height: calc(100vh - 5rem);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  row-gap: .42rem;
+  align-content: center;
+  justify-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: .25rem;
+}
+.lightbox__media-shell {
+  position: relative;
+  grid-column: 1;
+  grid-row: 1;
+  display: inline-grid;
+  grid-template-columns: minmax(0, auto);
+  grid-template-rows: auto minmax(0, 1fr);
+  justify-items: center;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+}
+.lightbox__location {
+  position: static;
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+  max-width: 100%;
+  margin: 0 0 .32rem;
+  padding: .46rem .68rem;
+  pointer-events: none;
+}
+.lightbox__image,
+.lightbox__video {
+  grid-column: 1;
+  grid-row: 2;
+  max-width: 100%;
+  max-height: min(66vh, calc(100vh - 15rem));
+}
+.lightbox__caption {
+  grid-column: 1;
+  grid-row: 2;
+  margin-top: .12rem;
+}
+.lightbox__live-controls {
+  position: static;
+  grid-column: 1;
+  grid-row: 3;
+  margin: .1rem 0 0;
+  transform: none;
+}
+.lightbox__live-controls .lightbox__live {
+  position: static;
+  left: auto;
+  bottom: auto;
+  margin: 0;
+  transform: none;
+}
+
+@media (max-width: 900px) {
+  .event-layout-stack .event-preview {
+    min-height: 38rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding-inline: .35rem;
+  }
+  .event-layout-stack .event-preview__item { max-width: 12rem; }
+}
+
+@media (max-width: 600px) {
+  .event-layout-stack .event-preview {
+    min-height: 45rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: center;
+    gap: .8rem;
+    padding: 2rem .2rem 3.5rem;
+  }
+  .event-layout-stack .event-preview__item { max-width: 10.5rem; }
+  .lightbox {
+    padding-top: 2.2rem;
+    padding-bottom: 3.8rem;
+  }
+  .lightbox__figure {
+    max-height: calc(100vh - 4.5rem);
+    row-gap: .35rem;
+  }
+  .lightbox__image,
+  .lightbox__video {
+    max-height: min(57vh, calc(100vh - 14rem));
+  }
+  .lightbox__location {
+    margin-bottom: .25rem;
+    padding: .42rem .58rem;
+  }
+}
