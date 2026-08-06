@@ -26,6 +26,41 @@ private struct GeocodeResponse: Encodable {
     let error: String?
 }
 
+private func isRetryableNetworkError(_ error: Error) -> Bool {
+    let value = error as NSError
+    return value.domain == kCLErrorDomain && value.code == CLError.Code.network.rawValue
+}
+
+private func geocodeWithBackoff(
+    _ request: GeocodeRequest,
+    locale: Locale
+) async throws -> CLPlacemark? {
+    let location = CLLocation(latitude: request.latitude, longitude: request.longitude)
+    let retryDelays: [UInt64] = [2, 6, 15]
+    var lastError: Error?
+
+    for attempt in 0...retryDelays.count {
+        do {
+            return try await CLGeocoder()
+                .reverseGeocodeLocation(location, preferredLocale: locale)
+                .first
+        } catch {
+            lastError = error
+            guard isRetryableNetworkError(error), attempt < retryDelays.count else {
+                throw error
+            }
+            let delay = retryDelays[attempt]
+            try? await Task.sleep(nanoseconds: delay * 1_000_000_000)
+        }
+    }
+
+    throw lastError ?? NSError(
+        domain: kCLErrorDomain,
+        code: CLError.Code.network.rawValue,
+        userInfo: [NSLocalizedDescriptionKey: "Не удалось выполнить геокодирование"]
+    )
+}
+
 private func runGeocoder() async {
     let decoder = JSONDecoder()
     let encoder = JSONEncoder()
@@ -38,9 +73,7 @@ private func runGeocoder() async {
 
         do {
             let request = try decoder.decode(GeocodeRequest.self, from: data)
-            let location = CLLocation(latitude: request.latitude, longitude: request.longitude)
-            let placemarks = try await CLGeocoder().reverseGeocodeLocation(location, preferredLocale: locale)
-            let placemark = placemarks.first
+            let placemark = try await geocodeWithBackoff(request, locale: locale)
             response = GeocodeResponse(
                 key: request.key,
                 latitude: request.latitude,
@@ -81,13 +114,15 @@ private func runGeocoder() async {
             )
         }
 
-        if let encoded = try? encoder.encode(response), let text = String(data: encoded, encoding: .utf8) {
+        if let encoded = try? encoder.encode(response),
+           let text = String(data: encoded, encoding: .utf8) {
             print(text)
             fflush(stdout)
         }
 
-        // Apple rate-limits geocoding. Keep requests deliberately sequential and gentle.
-        try? await Task.sleep(nanoseconds: 400_000_000)
+        // Apple rate-limits geocoding. Keep requests sequential and gentle;
+        // retryable network/rate-limit errors are additionally backed off above.
+        try? await Task.sleep(nanoseconds: 1_500_000_000)
     }
 }
 
