@@ -1,67 +1,57 @@
-window.TELEGRAM_MEDIA_MODES = {
-  "media/telegram/chat-cutout-01.png": "cutout",
-  "media/telegram/chat-02.jpg": "paper"
-};
+window.TELEGRAM_MEDIA_MODES = {};
 window.TELEGRAM_CHAPTER = {
   id: "telegram",
-  number: "TG",
-  kicker: "Слова, которые остались",
-  title: "То, что осталось в переписке",
-  subtitle: "Записки и несколько сообщений, которые сами стали частью истории.",
+  number: "FY",
+  kicker: "Несколько слов для тебя",
+  title: "For You",
+  subtitle: "Пожелания, которые я хочу оставить тебе рядом.",
   layout: "wide",
   theme: "blue",
   blocks: [
     {
       type: "note",
       telegramKind: "note",
-      text: "Это место не обязано быть архивом всего чата. Здесь можно оставить несколько слов, которые хочется сказать спокойно и без спешки.",
+      text: "Пожалуйста, не бойся начинать всё сначала, даже когда кажется, что сил уже нет.",
       style: "torn",
       shape: 1,
-      rotate: 0.75
-    },
-    {
-      type: "quote",
-      telegramKind: "message",
-      text: "Ты опять сохранил эту фотографию?",
-      author: "Соня",
-      speaker: "sonya",
-      screenshot: "media/telegram/chat-cutout-01.png",
-      screenshotAlt: "Демонстрационный скриншот сообщения Сони",
-      screenshotMode: "cutout",
-      shape: 2,
-      rotate: -0.45
-    },
-    {
-      type: "quote",
-      telegramKind: "message",
-      text: "Конечно. Я же знал, что однажды соберу из этого целую книгу.",
-      author: "Артём",
-      speaker: "me",
-      screenshot: "",
-      screenshotAlt: "",
-      screenshotMode: "paper",
-      shape: 3,
-      rotate: 1.05
-    },
-    {
-      type: "quote",
-      telegramKind: "message",
-      text: "Тогда пусть здесь останется и эта фраза.",
-      author: "Соня",
-      speaker: "sonya",
-      screenshot: "media/telegram/chat-02.jpg",
-      screenshotAlt: "Демонстрационный скриншот сообщения Сони",
-      screenshotMode: "paper",
-      shape: 4,
-      rotate: -0.8
+      rotate: 0.75,
+      layout: "left"
     },
     {
       type: "note",
       telegramKind: "note",
-      text: "А в конце главы можно оставить ещё одно напутствие — уже не как сообщение из прошлого, а как слова от тебя сейчас.",
+      text: "Выбирай себя без чувства вины. Ты имеешь право на жизнь, в которой тебе спокойно.",
+      style: "torn",
+      shape: 2,
+      rotate: -0.45,
+      layout: "right"
+    },
+    {
+      type: "note",
+      telegramKind: "note",
+      text: "Не забывай замечать хорошие дни, даже если они приходят тихо и ненадолго.",
+      style: "torn",
+      shape: 3,
+      rotate: 1.05,
+      layout: "auto"
+    },
+    {
+      type: "note",
+      telegramKind: "note",
+      text: "Оставайся такой же живой, любопытной и настоящей. Именно это в тебе невозможно не любить.",
       style: "torn",
       shape: 4,
-      rotate: -0.8
+      rotate: -0.8,
+      layout: "left"
+    },
+    {
+      type: "note",
+      telegramKind: "note",
+      text: "И где бы ты ни оказалась дальше, пожалуйста, будь счастлива.",
+      style: "torn",
+      shape: 0,
+      rotate: -1.2,
+      layout: "right"
     }
   ]
 };
