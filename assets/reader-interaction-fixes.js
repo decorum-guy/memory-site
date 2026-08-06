@@ -12,8 +12,20 @@
 
     function enforceVisibleEventOrder() {
       document.querySelectorAll(".memory-block--event .event-preview").forEach((preview) => {
+        const wrapper = preview.closest(".memory-block--event");
         const countBadge = preview.querySelector(".event-preview__count");
         const cards = [...preview.querySelectorAll(".event-preview__item")];
+
+        /* The legacy collage has only eight positional slots. A ninth visual
+           would reuse the first slot and disappear underneath another card.
+           Promote every 9+ visual event to the growing four-column grid even
+           when an older memories.js still stores layout: "collage". */
+        if (cards.length > 8 && wrapper) {
+          wrapper.classList.remove("event-layout-collage", "event-rows-1", "event-rows-2");
+          wrapper.classList.add("event-layout-stack");
+          wrapper.dataset.promotedToStack = "1";
+        }
+
         cards.sort((left, right) => sourceIndex(left) - sourceIndex(right));
         cards.forEach((card, index) => {
           card.dataset.mediaOrder = String(index);
