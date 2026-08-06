@@ -10,33 +10,40 @@
   transform: none;
 }
 
-/* Captions live in the white paper area below the media. They never overlap the
-   image, never exceed the decorative rule width and stop after four wrapped
-   lines with a browser-rendered ellipsis. */
+/* Restore the accepted event-polaroid shell from media.css + round4-polish.css.
+   The complete-event work must change only the surrounding layout, not shrink
+   the card or remove its paper margins. The 4:5 sheet, 18rem maximum width,
+   narrow top/side border and generous lower strip are the original design. */
 .event-preview__item {
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  aspect-ratio: auto;
-  padding: .55rem;
+  display: block;
+  aspect-ratio: 4 / 5;
+  padding: .55rem .55rem 2.65rem;
   overflow: hidden;
+  background: #fffaf0;
 }
 .event-preview__item .image-frame {
-  flex: 0 0 auto;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
 }
+
+/* Captions stay inside the original lower paper strip. They never overlap the
+   photograph, never exceed the decorative rule and stop after four wrapped
+   lines with an ellipsis. */
 .event-preview__caption,
 .event-preview__caption--short,
 .event-preview__caption--medium,
 .event-preview__caption--long {
-  position: relative;
-  inset: auto;
-  left: auto;
-  right: auto;
-  bottom: auto;
-  width: 72%;
+  position: absolute;
+  z-index: 6;
+  left: 14%;
+  right: 14%;
+  bottom: 1.08rem;
+  width: auto;
   height: auto;
   max-height: 4.8em;
-  margin: .46rem auto 0;
+  margin: 0;
   display: -webkit-box;
   align-items: initial;
   justify-content: initial;
@@ -54,36 +61,32 @@
 }
 .event-preview__item::after {
   content: "";
-  position: relative;
-  inset: auto;
-  left: auto;
-  right: auto;
-  bottom: auto;
-  display: block;
-  flex: 0 0 1px;
-  width: 72%;
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: .62rem;
+  width: auto;
   height: 1px;
-  margin: .46rem auto 0;
+  margin: 0;
   background: rgba(79, 63, 47, .28);
 }
 
-/* Imported events with 9+ items are marked as "stack". Every file is appended
-   by event-page-expansion.js and the grid grows vertically without a maximum
-   height. Four desktop columns keep cards readable instead of shrinking a
-   20+ item day into one tiny row. */
+/* Every imported visual file is appended by event-page-expansion.js. Large
+   events grow vertically without a maximum height, but use three full-size
+   desktop columns so the original 18rem polaroid design is preserved. */
 .event-layout-stack .event-preview {
-  min-height: clamp(20rem, 31vw, 27rem);
+  min-height: clamp(22rem, 34vw, 30rem);
   height: auto;
   max-height: none;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-auto-rows: max-content;
   align-items: start;
   align-content: start;
-  column-gap: clamp(.8rem, 1.6vw, 1.4rem);
-  row-gap: clamp(1.6rem, 3vw, 2.6rem);
+  column-gap: clamp(1rem, 2.2vw, 2rem);
+  row-gap: clamp(2rem, 4vw, 3.5rem);
   overflow: visible;
-  padding: clamp(2.2rem, 5vw, 4rem) clamp(.6rem, 1.8vw, 1.7rem) 4.2rem;
+  padding: clamp(2.5rem, 5vw, 4rem) clamp(.8rem, 2vw, 1.8rem) 4.5rem;
 }
 .event-layout-stack .event-preview::before {
   inset: 2.5rem 1.5% 2.2rem;
@@ -104,7 +107,7 @@
   top: auto;
   bottom: auto;
   width: 100%;
-  max-width: 15rem;
+  max-width: 18rem;
   justify-self: center;
   transform: translateY(var(--event-shelf-y, 0)) rotate(var(--event-rotate));
 }
@@ -198,27 +201,34 @@
 
 @media (max-width: 900px) {
   .event-layout-stack .event-preview {
-    min-height: 38rem;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    padding-inline: .45rem;
+    min-height: 40rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-inline: .65rem;
   }
-  .event-layout-stack .event-preview__item { max-width: 13rem; }
+  .event-layout-stack .event-preview__item { max-width: 18rem; }
 }
 
 @media (max-width: 600px) {
   .event-layout-stack .event-preview {
-    min-height: 45rem;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1.25rem .75rem;
+    min-height: 28rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.2rem;
     padding: 2rem .2rem 3.8rem;
   }
-  .event-layout-stack .event-preview__item { max-width: 10.5rem; }
+  .event-layout-stack .event-preview__item {
+    width: min(100%, 16rem);
+    max-width: 16rem;
+  }
   .event-preview__caption,
   .event-preview__caption--short,
   .event-preview__caption--medium,
-  .event-preview__caption--long,
+  .event-preview__caption--long {
+    left: 12%;
+    right: 12%;
+  }
   .event-preview__item::after {
-    width: 78%;
+    left: 12%;
+    right: 12%;
   }
   .lightbox {
     padding-top: 2.2rem;
