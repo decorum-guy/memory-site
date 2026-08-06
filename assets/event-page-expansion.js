@@ -20,6 +20,11 @@
     renderedEvents.forEach((wrapper, index) => expandEvent(wrapper, sourceEvents[index]));
     window.MEMORY_ROUND4?.classifyPolaroidCaptions?.();
 
+    window.MEMORY_EVENT_LAYOUT = {
+      eventDateKey,
+      cardLayout,
+    };
+
     function expandEvent(wrapper, block) {
       if (!wrapper || !block || !Array.isArray(block.items)) return;
       const preview = wrapper.querySelector(".event-preview");
@@ -45,8 +50,82 @@
         existingKeys.add(key);
       });
 
+      const dateKey = eventDateKey(block);
+      preview.dataset.eventDateSeed = dateKey;
+      applyDateLayout(preview, dateKey);
       preview.dataset.renderedItems = String(visualItems.length);
       wrapper.classList.add("event-preview-complete");
+    }
+
+    function applyDateLayout(preview, dateKey) {
+      [...preview.querySelectorAll(".event-preview__item")].forEach((card, index) => {
+        const layout = cardLayout(dateKey, index);
+        card.style.setProperty("--event-rotate", `${layout.rotate}deg`);
+        card.style.setProperty("--event-shelf-x", `${layout.x}rem`);
+        card.style.setProperty("--event-shelf-y", `${layout.y}rem`);
+        card.style.setProperty("--event-layer", String(layout.layer));
+      });
+    }
+
+    function eventDateKey(block) {
+      const candidates = [
+        block?.date,
+        ...(Array.isArray(block?.items) ? block.items.map((item) => item?.takenAt || item?.date) : []),
+      ];
+      for (const candidate of candidates) {
+        const match = String(candidate || "").match(/\b(\d{4}-\d{2}-\d{2})\b/);
+        if (match) return match[1];
+      }
+      return String(block?.title || block?.id || "event")
+        .trim()
+        .toLocaleLowerCase("ru-RU")
+        .replace(/\s+/g, " ");
+    }
+
+    function cardLayout(dateKey, index) {
+      const random = mulberry32(hashString(`${dateKey}|${index}`));
+      const column = index % 4;
+      const baseX = [.5, .16, -.16, -.5][column];
+      const baseY = [.35, -.25, .15, -.2][column];
+
+      let rotate = between(random, -5.6, 5.6);
+      if (Math.abs(rotate) < .85) rotate += rotate >= 0 ? .95 : -.95;
+
+      return {
+        rotate: round(rotate, 3),
+        x: round(baseX + between(random, -.14, .14), 3),
+        y: round(baseY + between(random, -.3, .3), 3),
+        layer: 2 + Math.floor(random() * 4),
+      };
+    }
+
+    function hashString(value) {
+      let hash = 2166136261;
+      for (let index = 0; index < value.length; index += 1) {
+        hash ^= value.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+      }
+      return hash >>> 0;
+    }
+
+    function mulberry32(seed) {
+      let state = seed >>> 0;
+      return function random() {
+        state += 0x6D2B79F5;
+        let value = state;
+        value = Math.imul(value ^ (value >>> 15), value | 1);
+        value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+        return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function between(random, min, max) {
+      return min + (max - min) * random();
+    }
+
+    function round(value, digits) {
+      const factor = 10 ** digits;
+      return Math.round(value * factor) / factor;
     }
 
     function openAtIndex(openButton, index) {
@@ -59,7 +138,6 @@
       const button = document.createElement("button");
       button.type = "button";
       button.className = `event-preview__item event-preview__item--${(index % 8) + 1}`;
-      button.style.setProperty("--event-rotate", `${[-5, 3, -2, 6, -4, 2, -1, 4][index % 8]}deg`);
       button.setAttribute("aria-label", item.censored ? `Открыть скрытый элемент ${index + 1}` : `Открыть элемент ${index + 1}`);
       button.appendChild(createFrame(item, key));
 
