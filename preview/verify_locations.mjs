@@ -15,15 +15,80 @@ async function downloadText(download) {
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await page.goto(`${base}/?opened=1`, { waitUntil: "networkidle" });
+
+  const pageTransforms = await page.locator("#memory-book > .memory-page").evaluateAll((pages) =>
+    pages.map((node) => getComputedStyle(node).transform)
+  );
+  assert(pageTransforms.length >= 4, "Reader fixture does not contain enough chapter pages");
+  assert(pageTransforms.every((value) => value === "none" || value === "matrix(1, 0, 0, 1, 0, 0)"),
+    `A whole chapter page is still rotated: ${pageTransforms.join(", ")}`);
+
+  const largeEvent = page.locator(".memory-block--event", { has: page.locator('[data-media-key="t01"]') });
+  await largeEvent.scrollIntoViewIfNeeded();
+  await largeEvent.evaluate((node) => {
+    node.classList.remove("event-layout-collage");
+    node.classList.add("event-layout-stack");
+  });
+  const stackRects = await largeEvent.locator(".event-preview__item").evaluateAll((items) =>
+    items.slice(0, 5).map((node) => {
+      const rect = node.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, width: rect.width };
+    })
+  );
+  assert(stackRects.length === 5, "Large event preview did not expose five representative cards");
+  const distinctColumns = new Set(stackRects.map((rect) => Math.round(rect.left / 25))).size;
+  const horizontalSpan = Math.max(...stackRects.map((rect) => rect.right)) - Math.min(...stackRects.map((rect) => rect.left));
+  assert(distinctColumns >= 5, `Large event cards are still stacked into the same column: ${JSON.stringify(stackRects)}`);
+  assert(horizontalSpan > 650, `Large event preview is still too compressed: ${horizontalSpan}px`);
+
   await page.locator("#ordinary-days").scrollIntoViewIfNeeded();
   await page.locator('[data-media-key="d01"]').click();
   const location = page.locator("#lightbox-location");
   await location.waitFor({ state: "visible" });
   assert((await location.textContent())?.includes("Москва, Россия"), "Fullscreen place label is missing or incorrect");
 
+  const locationGeometry = await page.evaluate(() => {
+    const badge = document.getElementById("lightbox-location").getBoundingClientRect();
+    const image = document.getElementById("lightbox-image").getBoundingClientRect();
+    return {
+      badgeBottom: badge.bottom,
+      badgeLeft: badge.left,
+      imageTop: image.top,
+      imageLeft: image.left,
+      gap: image.top - badge.bottom,
+    };
+  });
+  assert(locationGeometry.badgeBottom <= locationGeometry.imageTop + 1,
+    `Location overlaps the photograph: ${JSON.stringify(locationGeometry)}`);
+  assert(locationGeometry.gap >= 0 && locationGeometry.gap <= 10,
+    `Location is not kept just above the photograph: ${JSON.stringify(locationGeometry)}`);
+  assert(Math.abs(locationGeometry.badgeLeft - locationGeometry.imageLeft) <= 8,
+    `Location is not aligned to the photograph left edge: ${JSON.stringify(locationGeometry)}`);
+
   await page.locator("#lightbox-close").click();
   await page.locator('[data-media-key="d02"]').click();
   assert(await location.isHidden(), "Location badge stayed visible for an item without a place");
+  await page.locator("#lightbox-close").click();
+
+  await page.locator("#journeys").scrollIntoViewIfNeeded();
+  await page.locator('[data-media-key="t05"]').click();
+  const liveButton = page.locator("#lightbox-live");
+  await liveButton.waitFor({ state: "visible" });
+  const liveGeometry = await page.evaluate(() => {
+    const caption = document.getElementById("lightbox-caption").getBoundingClientRect();
+    const controls = document.querySelector(".lightbox__live-controls").getBoundingClientRect();
+    const image = document.getElementById("lightbox-image").getBoundingClientRect();
+    return {
+      imageBottom: image.bottom,
+      captionTop: caption.top,
+      captionBottom: caption.bottom,
+      controlsTop: controls.top,
+    };
+  });
+  assert(liveGeometry.imageBottom <= liveGeometry.captionTop + 1,
+    `Caption overlaps Live Photo media: ${JSON.stringify(liveGeometry)}`);
+  assert(liveGeometry.captionBottom <= liveGeometry.controlsTop + 1,
+    `Live Photo controls overlap the caption: ${JSON.stringify(liveGeometry)}`);
   await page.locator("#lightbox-close").click();
   await page.close();
 
@@ -47,8 +112,12 @@ try {
   await studio.close();
 
   console.log(JSON.stringify({
+    stableChapterPages: true,
+    readableLargeEventPreview: true,
     fullscreenLocation: true,
+    locationAboveMedia: true,
     missingLocationHidden: true,
+    liveControlsBelowCaption: true,
     studioLocationEditor: true,
     locationExport: true,
     gpsPreserved: true,
