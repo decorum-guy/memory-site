@@ -9,7 +9,11 @@ on:
       - "assets/app.js"
       - "assets/event-page-expansion.js"
       - "assets/reader-layout-fixes.css"
+      - "assets/typography-settings.js"
       - "assets/memory-book-icon.svg"
+      - "tools/studio-round4.js"
+      - "tools/studio-round4.css"
+      - "tools/telegram_server.py"
       - "preview/verify_event_pages.mjs"
       - ".github/workflows/event-page-functional.yml"
 
@@ -29,8 +33,13 @@ jobs:
         with:
           node-version: "20"
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Prepare thirteen-item event fixture
         run: |
+          python -m pip install --disable-pip-version-check pillow
           python3 - <<'PY'
           from pathlib import Path
           import json
@@ -75,7 +84,10 @@ jobs:
               encoding="utf-8",
           )
           PY
+          python -m py_compile tools/telegram_server.py
           node --check assets/event-page-expansion.js
+          node --check assets/typography-settings.js
+          node --check tools/studio-round4.js
           node --check preview/verify_event_pages.mjs
           test -f assets/memory-book-icon.svg
 
@@ -85,11 +97,11 @@ jobs:
           npm install --no-audit --no-fund playwright@1.54.2
           npx playwright install --with-deps chromium
 
-      - name: Verify complete event rendering
+      - name: Verify complete event rendering and Studio apply
         run: |
-          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/event-page-server.log 2>&1 &
+          python3 tools/telegram_server.py >/tmp/memory-server.log 2>&1 &
           for attempt in {1..30}; do
-            curl --fail --silent http://127.0.0.1:4173/ >/dev/null && break
+            curl --fail --silent http://127.0.0.1:8765/ >/dev/null && break
             sleep 1
           done
-          node preview/verify_event_pages.mjs
+          PREVIEW_URL=http://127.0.0.1:8765 node preview/verify_event_pages.mjs
