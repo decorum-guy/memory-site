@@ -10,9 +10,16 @@
     if (!book || !Array.isArray(book.chapters)) return;
 
     const sourceEvents = [];
-    book.chapters.forEach((chapter) => {
-      (chapter.blocks || []).forEach((block) => {
-        if (block && block.type === "event") sourceEvents.push(block);
+    book.chapters.forEach((chapter, chapterIndex) => {
+      (chapter.blocks || []).forEach((block, blockIndex) => {
+        if (block && block.type === "event") {
+          sourceEvents.push({
+            block,
+            chapterId: chapter.id || `chapter-${chapterIndex + 1}`,
+            chapterIndex,
+            blockIndex,
+          });
+        }
       });
     });
 
@@ -21,11 +28,14 @@
     window.MEMORY_ROUND4?.classifyPolaroidCaptions?.();
 
     window.MEMORY_EVENT_LAYOUT = {
-      eventDateKey,
+      eventIdentityKey,
+      mediaIdentityToken,
       cardLayout,
+      hash128,
     };
 
-    function expandEvent(wrapper, block) {
+    function expandEvent(wrapper, context) {
+      const block = context?.block;
       if (!wrapper || !block || !Array.isArray(block.items)) return;
       const preview = wrapper.querySelector(".event-preview");
       const openButton = wrapper.querySelector(".event-open");
@@ -33,33 +43,42 @@
       if (!preview || !openButton) return;
 
       const allItems = block.items.map(normalizeItem);
-      const visualItems = allItems.filter((item) => item.kind !== "audio");
-      const existingKeys = new Set(
-        [...preview.querySelectorAll(".image-frame[data-media-key]")]
-          .map((frame) => frame.dataset.mediaKey)
-          .filter(Boolean)
-      );
+      const visualEntries = allItems
+        .map((item, allIndex) => ({ item, allIndex }))
+        .filter(({ item }) => item.kind !== "audio");
+      const existingCards = [...preview.querySelectorAll(".event-preview__item")];
 
-      visualItems.forEach((item, visualIndex) => {
-        const allIndex = allItems.findIndex((candidate) => candidate === item);
-        const key = mediaKey(item, allIndex);
-        if (existingKeys.has(key)) return;
-        const button = createPreviewButton(item, visualIndex, key);
-        button.addEventListener("click", () => openAtIndex(openButton, allIndex));
-        preview.insertBefore(button, countBadge || null);
-        existingKeys.add(key);
+      /* The original Reader renders the first cards. Match those cards by their
+         visual position, not only by id/src: manually copied or damaged data may
+         legitimately contain duplicate identifiers and every file must remain. */
+      existingCards.forEach((card, visualIndex) => {
+        const entry = visualEntries[visualIndex];
+        const frame = card.querySelector(".image-frame");
+        if (entry && frame) {
+          frame.dataset.mediaInstanceKey = mediaInstanceKey(entry.item, visualIndex);
+        }
       });
 
-      const dateKey = eventDateKey(block);
-      preview.dataset.eventDateSeed = dateKey;
-      applyDateLayout(preview, dateKey);
-      preview.dataset.renderedItems = String(visualItems.length);
+      for (let visualIndex = existingCards.length; visualIndex < visualEntries.length; visualIndex += 1) {
+        const entry = visualEntries[visualIndex];
+        const key = mediaKey(entry.item, entry.allIndex);
+        const button = createPreviewButton(entry.item, visualIndex, key);
+        const frame = button.querySelector(".image-frame");
+        if (frame) frame.dataset.mediaInstanceKey = mediaInstanceKey(entry.item, visualIndex);
+        button.addEventListener("click", () => openAtIndex(openButton, entry.allIndex));
+        preview.insertBefore(button, countBadge || null);
+      }
+
+      const eventKey = eventIdentityKey(block, context);
+      preview.dataset.eventIdentitySeed = eventKey;
+      applyEventLayout(preview, eventKey);
+      preview.dataset.renderedItems = String(visualEntries.length);
       wrapper.classList.add("event-preview-complete");
     }
 
-    function applyDateLayout(preview, dateKey) {
+    function applyEventLayout(preview, eventKey) {
       [...preview.querySelectorAll(".event-preview__item")].forEach((card, index) => {
-        const layout = cardLayout(dateKey, index);
+        const layout = cardLayout(eventKey, index);
         card.style.setProperty("--event-rotate", `${layout.rotate}deg`);
         card.style.setProperty("--event-shelf-x", `${layout.x}rem`);
         card.style.setProperty("--event-shelf-y", `${layout.y}rem`);
@@ -67,23 +86,60 @@
       });
     }
 
-    function eventDateKey(block) {
-      const candidates = [
-        block?.date,
-        ...(Array.isArray(block?.items) ? block.items.map((item) => item?.takenAt || item?.date) : []),
-      ];
-      for (const candidate of candidates) {
-        const match = String(candidate || "").match(/(\d{4}-\d{2}-\d{2})/);
-        if (match) return match[1];
-      }
-      return String(block?.title || block?.id || "event")
-        .trim()
-        .toLocaleLowerCase("ru-RU")
-        .replace(/\s+/g, " ");
+    /* A date alone is intentionally not an identity: one day may contain many
+       separate events. The key combines chapter namespace, explicit block id and
+       a canonical, order-independent fingerprint of every media item. Text,
+       crop, location and item order do not alter the layout. */
+    function eventIdentityKey(block, context = {}) {
+      const mediaTokens = (Array.isArray(block?.items) ? block.items : [])
+        .map(mediaIdentityToken)
+        .sort();
+      const explicitId = normalizeIdentityPart(block?.id);
+      const chapterId = normalizeIdentityPart(context.chapterId);
+      const fallback = explicitId || mediaTokens.length
+        ? []
+        : [
+            normalizeIdentityPart(block?.date),
+            normalizeIdentityPart(block?.title),
+            normalizeIdentityPart(block?.type),
+            Number.isInteger(context.chapterIndex) ? context.chapterIndex : -1,
+            Number.isInteger(context.blockIndex) ? context.blockIndex : -1,
+          ];
+      const canonical = JSON.stringify([
+        "memory-event-identity-v3",
+        chapterId,
+        explicitId,
+        mediaTokens,
+        fallback,
+      ]);
+      return `evt-${hash128(canonical)}`;
     }
 
-    function cardLayout(dateKey, index) {
-      const random = mulberry32(hashString(`${dateKey}|${index}`));
+    function mediaIdentityToken(item) {
+      const stable = [
+        normalizeIdentityPart(item?.id),
+        normalizeIdentityPart(item?.src),
+        normalizeIdentityPart(item?.thumb),
+        normalizeIdentityPart(item?.poster),
+        normalizeIdentityPart(item?.liveVideo),
+        normalizeIdentityPart(item?.takenAt || item?.date),
+        normalizeIdentityPart(item?.kind),
+      ];
+      if (stable.some(Boolean)) return JSON.stringify(stable);
+      return JSON.stringify([
+        "fallback-media",
+        normalizeIdentityPart(item?.kind),
+        normalizeIdentityPart(item?.caption || item?.note),
+        normalizeIdentityPart(item?.alt),
+      ]);
+    }
+
+    function normalizeIdentityPart(value) {
+      return String(value ?? "").trim().normalize("NFC");
+    }
+
+    function cardLayout(eventKey, index) {
+      const random = xoshiro128(seedWords(`${eventKey}|card:${index}`));
       const column = index % 4;
       const baseX = [.5, .16, -.16, -.5][column];
       const baseY = [.35, -.25, .15, -.2][column];
@@ -99,24 +155,56 @@
       };
     }
 
-    function hashString(value) {
-      let hash = 2166136261;
+    function hash128(value) {
+      const salts = [0x243f6a88, 0x85a308d3, 0x13198a2e, 0x03707344];
+      return salts
+        .map((salt, index) => hash32(`${index}|${value}`, salt).toString(16).padStart(8, "0"))
+        .join("");
+    }
+
+    function hash32(value, seed) {
+      let hash = (0x811c9dc5 ^ seed) >>> 0;
       for (let index = 0; index < value.length; index += 1) {
         hash ^= value.charCodeAt(index);
-        hash = Math.imul(hash, 16777619);
+        hash = Math.imul(hash, 0x01000193);
+        hash ^= hash >>> 13;
       }
+      hash ^= hash >>> 16;
+      hash = Math.imul(hash, 0x85ebca6b);
+      hash ^= hash >>> 13;
+      hash = Math.imul(hash, 0xc2b2ae35);
+      hash ^= hash >>> 16;
       return hash >>> 0;
     }
 
-    function mulberry32(seed) {
-      let state = seed >>> 0;
+    function seedWords(value) {
+      const words = [
+        hash32(`${value}|a`, 0x9e3779b9),
+        hash32(`${value}|b`, 0x7f4a7c15),
+        hash32(`${value}|c`, 0x94d049bb),
+        hash32(`${value}|d`, 0x5bd1e995),
+      ];
+      if (words.every((word) => word === 0)) words[0] = 1;
+      return words;
+    }
+
+    function xoshiro128(words) {
+      let [a, b, c, d] = words.map((word) => word >>> 0);
       return function random() {
-        state += 0x6D2B79F5;
-        let value = state;
-        value = Math.imul(value ^ (value >>> 15), value | 1);
-        value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-        return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+        const result = Math.imul(rotateLeft(Math.imul(b, 5) >>> 0, 7), 9) >>> 0;
+        const temporary = (b << 9) >>> 0;
+        c ^= a;
+        d ^= b;
+        b ^= c;
+        a ^= d;
+        c ^= temporary;
+        d = rotateLeft(d, 11);
+        return result / 4294967296;
       };
+    }
+
+    function rotateLeft(value, shift) {
+      return ((value << shift) | (value >>> (32 - shift))) >>> 0;
     }
 
     function between(random, min, max) {
@@ -236,6 +324,10 @@
 
     function mediaKey(item, fallbackIndex) {
       return String(item.id || item.src || `${item.kind}-${fallbackIndex}`);
+    }
+
+    function mediaInstanceKey(item, visualIndex) {
+      return `${mediaKey(item, visualIndex)}::${visualIndex}`;
     }
 
     function defaultAlt(kind) {
