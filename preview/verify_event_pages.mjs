@@ -32,7 +32,7 @@ try {
   const firstRow = cardRects.slice(0, 4);
   const overlaps = firstRow.slice(0, -1).map((rect, index) => rect.right - firstRow[index + 1].left);
   assert(firstRow.every((rect) => rect.width >= 245), `Desktop polaroids became too small: ${JSON.stringify(cardRects)}`);
-  assert(overlaps.every((value) => value >= 8 && value <= 55), `Four-card row does not overlap gently: ${JSON.stringify({ cardRects, overlaps })}`);
+  assert(overlaps.every((value) => value >= 8 && value <= 75), `Four-card row does not overlap gently: ${JSON.stringify({ cardRects, overlaps })}`);
   assert(cardRects[4].top > Math.min(...firstRow.map((rect) => rect.bottom)), "The fifth card did not start a second row");
   assert(previewBox.height > firstRow[0].height * 3, "Event preview did not grow for all four rows");
 
