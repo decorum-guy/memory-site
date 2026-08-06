@@ -118,6 +118,14 @@
   transform: none;
 }
 
+/* The censor card must not collapse when app.js hides the underlying image.
+   Keep it attached to the full lightbox viewport rather than to the intrinsic
+   dimensions of the media shell. */
+.lightbox__censor {
+  position: fixed;
+  inset: 0;
+}
+
 @media (max-width: 900px) {
   .event-layout-stack .event-preview {
     min-height: 38rem;
