@@ -15,6 +15,15 @@ import telegram_server as base
 
 
 class Handler(base.Handler):
+    def copyfile(self, source, outputfile) -> None:
+        try:
+            super().copyfile(source, outputfile)
+        except (BrokenPipeError, ConnectionResetError):
+            # Browsers routinely cancel an old byte-range request after seeking
+            # or replacing a video source. This is a normal client disconnect,
+            # not a server or media failure, so keep the local server quiet.
+            self._range_remaining = None
+
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
         if path not in {"/api/memory/import/upload", "/api/memory/import/process"}:
