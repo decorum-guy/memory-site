@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Local Memory/Telegram Studio server with incremental media import.
+"""Local Memory/For You Studio server with incremental media import.
 
 Use this instead of telegram_server.py when Memory Studio must accept new
-photos, videos or explicit Live Photo pairs. Existing Telegram and production
-apply endpoints are inherited unchanged.
+photos, videos or explicit Live Photo pairs. Existing optional-chapter and
+production apply endpoints are inherited unchanged.
 """
 from __future__ import annotations
 
@@ -12,6 +12,26 @@ from typing import Any
 
 import incremental_media_import as media_import
 import telegram_server as base
+
+
+FOR_YOU_DEFAULTS = {
+    "kicker": "Несколько слов для тебя",
+    "title": "For You",
+    "subtitle": "Пожелания, которые я хочу оставить тебе рядом.",
+}
+base.DEFAULT_STATE.update(FOR_YOU_DEFAULTS)
+_base_build_chapter = base.build_chapter
+
+
+def build_for_you_chapter(state: dict[str, Any]):
+    modes, chapter = _base_build_chapter(state)
+    # Keep the technical id for compatibility with the existing Reader and
+    # preview URL, but remove the old TG label from the visible chapter rail.
+    chapter["number"] = "FY"
+    return modes, chapter
+
+
+base.build_chapter = build_for_you_chapter
 
 
 class Handler(base.Handler):
