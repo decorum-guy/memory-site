@@ -1,8 +1,18 @@
 import { chromium } from "playwright";
+import { writeFile, unlink } from "node:fs/promises";
+import { resolve } from "node:path";
 
-const base = process.env.PREVIEW_URL || "http://127.0.0.1:4173";
+const base = process.env.PREVIEW_URL || "http://127.0.0.1:8765";
 const browser = await chromium.launch({ headless: true });
 function assert(value, message) { if (!value) throw new Error(message); }
+
+async function downloadText(download) {
+  const stream = await download.createReadStream();
+  assert(stream, "Exported memories.js stream is unavailable");
+  let text = "";
+  for await (const chunk of stream) text += chunk.toString("utf8");
+  return text;
+}
 
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -13,12 +23,18 @@ try {
   const cards = event.locator(".event-preview__item");
   assert(await cards.count() === 13, `Expected 13 event cards, got ${await cards.count()}`);
 
-  const firstBox = await cards.nth(0).boundingBox();
-  const lastBox = await cards.nth(12).boundingBox();
+  const cardRects = await cards.evaluateAll((items) => items.slice(0, 5).map((node) => {
+    const rect = node.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
+  }));
   const previewBox = await event.locator(".event-preview").boundingBox();
-  assert(firstBox && lastBox && previewBox, "Event geometry is unavailable");
-  assert(lastBox.y > firstBox.y + firstBox.height, "All cards stayed in one row instead of growing the event vertically");
-  assert(previewBox.height > firstBox.height * 4, "Event preview did not grow for all full-size rows");
+  assert(cardRects.length === 5 && previewBox, "Event geometry is unavailable");
+  const firstRow = cardRects.slice(0, 4);
+  const overlaps = firstRow.slice(0, -1).map((rect, index) => rect.right - firstRow[index + 1].left);
+  assert(firstRow.every((rect) => rect.width >= 245), `Desktop polaroids became too small: ${JSON.stringify(cardRects)}`);
+  assert(overlaps.every((value) => value >= 8 && value <= 55), `Four-card row does not overlap gently: ${JSON.stringify({ cardRects, overlaps })}`);
+  assert(cardRects[4].top > Math.min(...firstRow.map((rect) => rect.bottom)), "The fifth card did not start a second row");
+  assert(previewBox.height > firstRow[0].height * 3, "Event preview did not grow for all four rows");
 
   const firstCard = cards.nth(0);
   const caption = firstCard.locator(".event-preview__caption");
@@ -39,12 +55,10 @@ try {
     };
   });
   assert(cardState.aspectRatio === "4 / 5", `Original 4:5 polaroid proportion was lost: ${JSON.stringify(cardState)}`);
-  assert(cardState.width >= 260, `Desktop polaroid became too small: ${JSON.stringify(cardState)}`);
   assert(cardState.paddingTop >= 8 && cardState.paddingRight >= 8, `Top/side paper margin collapsed: ${JSON.stringify(cardState)}`);
   assert(cardState.paddingBottom >= 40, `Lower white paper strip collapsed: ${JSON.stringify(cardState)}`);
   assert(frameBox.x >= cardBox.x + 7 && frameBox.y >= cardBox.y + 7, "Photo touches the top or side card edge");
   assert(cardBox.y + cardBox.height - (frameBox.y + frameBox.height) >= 60, "White lower polaroid area is no longer visible");
-
   assert(captionBox.x >= cardBox.x, "Caption escapes the left card edge");
   assert(captionBox.x + captionBox.width <= cardBox.x + cardBox.width, "Caption escapes the right card edge");
 
@@ -80,16 +94,54 @@ try {
   const favicon = page.locator('link[rel="icon"]');
   assert(await favicon.count() === 1, "Offline favicon link is missing");
   assert((await favicon.getAttribute("href")) === "assets/memory-book-icon.svg", "Unexpected favicon path");
+  await page.close();
+
+  const studio = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  await studio.goto(`${base}/tools/studio.html`, { waitUntil: "networkidle" });
+  await studio.locator("#book-settings").waitFor({ state: "visible" });
+  assert(await studio.locator('[data-typography-field="eventCaptionPx"]').count() === 1, "Day-caption type control is missing");
+  assert(await studio.locator('[data-typography-field="eventDatePx"]').count() === 1, "Day-date type control is missing");
+  assert(await studio.locator('[data-typography-field="polaroidCaptionScale"]').count() === 1, "Polaroid-caption type control is missing");
+  assert(await studio.locator("#apply-production-file").count() === 1, "One-click production apply control is missing");
+
+  await studio.locator('[data-typography-field="eventCaptionPx"]').evaluate((node) => {
+    node.value = "22";
+    node.dispatchEvent(new Event("input", { bubbles: true }));
+    node.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  const previewSize = parseFloat(await studio.locator('[data-type-preview="eventCaption"]').evaluate((node) => getComputedStyle(node).fontSize));
+  assert(Math.abs(previewSize - 22) < .5, `Studio typography preview did not update: ${previewSize}`);
+
+  const downloadPromise = studio.waitForEvent("download");
+  await studio.locator("#export").click();
+  const exported = await downloadText(await downloadPromise);
+  assert(exported.includes('"eventCaptionPx": 22'), "Typography setting did not reach exported memories.js");
+
+  const applyPath = resolve("preview/.memory-apply-test.js");
+  await writeFile(applyPath, exported, "utf8");
+  studio.on("dialog", (dialog) => dialog.accept());
+  const popupPromise = studio.waitForEvent("popup");
+  await studio.locator("#apply-production-file").setInputFiles(applyPath);
+  const popup = await popupPromise;
+  await studio.locator("#status").filter({ hasText: "Production обновлён" }).waitFor({ state: "visible", timeout: 15000 });
+  await popup.waitForLoadState("networkidle");
+  const appliedSize = await popup.evaluate(() => window.MEMORY_BOOK?.meta?.typography?.eventCaptionPx);
+  assert(appliedSize === 22, `Applied production book lost typography settings: ${appliedSize}`);
+  await popup.close();
+  await studio.close();
+  await unlink(applyPath).catch(() => {});
 
   console.log(JSON.stringify({
     renderedCards: 13,
-    multiRowHeight: true,
+    overlappingFourCardRows: true,
     originalPolaroidSize: true,
     originalPaperMargins: true,
     captionBelowMedia: true,
     captionFourLineClamp: true,
     lastCardOpensCorrectItem: true,
     offlineFavicon: true,
+    typographyControls: true,
+    oneClickProductionApply: true,
   }, null, 2));
 } finally {
   await browser.close();
