@@ -18,54 +18,60 @@ try {
   await page.goto(`${base}/tools/telegram_studio.html`, { waitUntil: "networkidle" });
   await page.locator("#status").filter({ hasText: "Готово" }).waitFor();
 
+  assert((await page.title()).startsWith("For You Studio"), `Unexpected Studio title: ${await page.title()}`);
+  assert((await page.locator(".studio-tabs a.is-active").textContent())?.trim() === "For You", "For You tab is not active");
+  assert(await page.locator("#add-quote").count() === 0, "Legacy quote button is still visible");
+  assert(await page.locator("#title").inputValue() === "For You", "For You title is not the default");
+
   await page.locator("#add-note").click();
-  const note = page.locator(".block").last();
-  await note.locator("textarea").fill("Моя тестовая записка для Сони.");
-  const initialShape = shapeNumber(await note.locator(".note-preview").getAttribute("class"));
-  await note.locator("[data-shape]").click();
-  const changedNote = page.locator(".block").first();
-  const changedShape = shapeNumber(await changedNote.locator(".note-preview").getAttribute("class"));
+  const first = page.locator(".block").last();
+  await first.locator("textarea").fill("Первое тестовое пожелание для Сони.");
+  const initialShape = shapeNumber(await first.locator(".note-preview").getAttribute("class"));
+  await first.locator("[data-shape]").click();
+  const changedFirst = page.locator(".block").last();
+  const changedShape = shapeNumber(await changedFirst.locator(".note-preview").getAttribute("class"));
   assert(Number.isInteger(initialShape) && Number.isInteger(changedShape), "Could not read torn-paper shape classes");
   assert(changedShape !== initialShape, `Shape control did not change the edge: ${initialShape} -> ${changedShape}`);
+  await changedFirst.locator("[data-layout]").selectOption("left");
 
-  await page.locator("#add-quote").click();
-  const quote = page.locator(".block").last();
-  await quote.locator("select").selectOption("me");
-  await quote.locator("textarea").fill("Тестовое сообщение от Артёма.");
-  const fileInput = quote.locator("input[type=file]");
-  await fileInput.setInputFiles("media/telegram/chat-05.jpg");
-  await quote.locator(".shot-preview img").waitFor({ state: "visible" });
+  await page.locator("#add-note").click();
+  const second = page.locator(".block").last();
+  await second.locator("textarea").fill("Второе тестовое пожелание.");
+  await second.locator("[data-layout]").selectOption("right");
 
   await page.locator("#add-note").click();
   const disposable = page.locator(".block").last();
   await disposable.locator("[data-remove]").click();
-  assert(await page.locator(".block").count() === 2, "Telegram block remove control did not work after rendering");
+  assert(await page.locator(".block").count() === 2, "Wish remove control did not work after rendering");
 
   await page.locator("#save").click();
-  await page.locator("#status").filter({ hasText: "Сохранено" }).waitFor();
+  await page.locator("#status").filter({ hasText: "Сохранено пожеланий: 2" }).waitFor();
 
   const state = await page.evaluate(async () => {
     const response = await fetch("/api/telegram/state", { cache: "no-store" });
     return response.json();
   });
+  assert(state.title === "For You", `For You title did not persist: ${JSON.stringify(state)}`);
   assert(state.blocks.length === 2, `Unexpected saved block count: ${JSON.stringify(state)}`);
-  assert(state.blocks[0].type === "note", `First block is not a note: ${JSON.stringify(state.blocks[0])}`);
+  assert(state.blocks.every((block) => block.type === "note"), `Non-note blocks survived: ${JSON.stringify(state.blocks)}`);
   assert(state.blocks[0].shape === changedShape, `Shape control did not persist: expected ${changedShape}, got ${JSON.stringify(state.blocks[0])}`);
-  assert(state.blocks[1].type === "quote" && state.blocks[1].speaker === "me", `Speaker did not persist: ${JSON.stringify(state.blocks[1])}`);
-  assert(Boolean(state.blocks[1].screenshot), `Optional screenshot did not persist: ${JSON.stringify(state.blocks[1])}`);
+  assert(state.blocks[0].layout === "left" && state.blocks[1].layout === "right", `Wish placement did not persist: ${JSON.stringify(state.blocks)}`);
 
   const generated = await page.evaluate(async () => {
     const response = await fetch("/content/telegram.js", { cache: "no-store" });
     return response.text();
   });
-  assert(generated.includes('"telegramKind": "note"'), "Generated chapter has no note block");
-  assert(generated.includes('"speaker": "me"'), "Generated chapter has no Artem quote");
-  assert(generated.includes('"screenshot": "media/telegram/'), "Generated chapter has no optional screenshot");
+  assert(generated.includes('"title": "For You"'), "Generated chapter lost the For You title");
+  assert(generated.includes('"number": "FY"'), "Generated chapter still exposes the TG rail label");
+  assert((generated.match(/"telegramKind": "note"/g) || []).length === 2, "Generated chapter has the wrong number of wishes");
+  assert(!generated.includes('"telegramKind": "message"'), "Generated chapter still contains message quotes");
 
   console.log(JSON.stringify({
+    forYouStudio: true,
+    legacyQuotesRemoved: true,
     initialShape,
     changedShape,
-    blocks: state.blocks.map(({ type, speaker, shape, screenshot }) => ({ type, speaker, shape, screenshot: Boolean(screenshot) })),
+    wishes: state.blocks.map(({ type, shape, layout }) => ({ type, shape, layout })),
     generated: "ok",
   }, null, 2));
 } finally {
