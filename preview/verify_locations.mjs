@@ -32,14 +32,17 @@ try {
   const stackRects = await largeEvent.locator(".event-preview__item").evaluateAll((items) =>
     items.slice(0, 5).map((node) => {
       const rect = node.getBoundingClientRect();
-      return { left: rect.left, right: rect.right, top: rect.top, width: rect.width };
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width };
     })
   );
-  assert(stackRects.length === 5, "Large event preview did not expose five representative cards");
-  const distinctColumns = new Set(stackRects.map((rect) => Math.round(rect.left / 25))).size;
-  const horizontalSpan = Math.max(...stackRects.map((rect) => rect.right)) - Math.min(...stackRects.map((rect) => rect.left));
-  assert(distinctColumns >= 5, `Large event cards are still stacked into the same column: ${JSON.stringify(stackRects)}`);
+  assert(stackRects.length === 5, "Large event fixture does not contain five cards");
+  const firstRow = stackRects.slice(0, 4);
+  const distinctColumns = new Set(firstRow.map((rect) => Math.round(rect.left / 25))).size;
+  const horizontalSpan = Math.max(...firstRow.map((rect) => rect.right)) - Math.min(...firstRow.map((rect) => rect.left));
+  assert(distinctColumns === 4, `Large event does not expose four readable desktop columns: ${JSON.stringify(stackRects)}`);
   assert(horizontalSpan > 650, `Large event preview is still too compressed: ${horizontalSpan}px`);
+  assert(stackRects[4].top > Math.min(...firstRow.map((rect) => rect.bottom)),
+    `The fifth card did not start a new growing row: ${JSON.stringify(stackRects)}`);
 
   await page.locator("#ordinary-days").scrollIntoViewIfNeeded();
   await page.locator('[data-media-key="d01"]').click();
@@ -113,7 +116,7 @@ try {
 
   console.log(JSON.stringify({
     stableChapterPages: true,
-    readableLargeEventPreview: true,
+    readableGrowingEventGrid: true,
     fullscreenLocation: true,
     locationAboveMedia: true,
     missingLocationHidden: true,
