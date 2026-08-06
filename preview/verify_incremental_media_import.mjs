@@ -74,8 +74,9 @@ try {
   const largest = importedEvents.sort((a, b) => (b.items?.length || 0) - (a.items?.length || 0))[0];
   assert((largest.items || []).length >= 19, "Large batch was not kept together by its metadata dates");
 
-  const readerCards = popup.locator(`#${largest.id} .event-preview__item`);
-  await popup.locator(`#${largest.id}`).scrollIntoViewIfNeeded();
+  const readerEvent = popup.locator(".memory-block--event").filter({ hasText: largest.title }).first();
+  await readerEvent.scrollIntoViewIfNeeded();
+  const readerCards = readerEvent.locator(".event-preview__item");
   assert(await readerCards.count() === largest.items.length, "Reader hid imported files in a large event");
   await popup.close();
 
