@@ -1,6 +1,7 @@
 (function () {
   installStudioTabs();
   installProductionApply();
+  installIncrementalMediaImportAssets();
 
   const baseNormalizeBook = normalizeBook;
   normalizeBook = function round4NormalizeBook() {
@@ -114,6 +115,15 @@
     label.querySelector("input").addEventListener("change", applyProductionFile);
   }
 
+  function installIncrementalMediaImportAssets() {
+    if (document.querySelector('script[data-studio-media-import]')) return;
+    const script = document.createElement("script");
+    script.src = "studio-media-import.js";
+    script.dataset.studioMediaImport = "1";
+    script.defer = true;
+    document.head.appendChild(script);
+  }
+
   async function applyProductionFile(fileEvent) {
     const input = fileEvent.target;
     const file = input.files?.[0];
@@ -155,7 +165,7 @@
     } catch (error) {
       if (previewWindow && !previewWindow.closed) previewWindow.close();
       const localHint = location.protocol === "file:"
-        ? " Открой Studio через python3 tools/telegram_server.py, а не как file://."
+        ? " Открой Studio через python3 tools/memory_server.py, а не как file://."
         : "";
       status.textContent = `Не удалось применить файл: ${error.message}.${localHint}`;
       alert(`Не удалось применить memories.js: ${error.message}.${localHint}`);
