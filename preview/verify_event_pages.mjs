@@ -14,14 +14,184 @@ async function downloadText(download) {
   return text;
 }
 
+async function readerLayoutSnapshot(page) {
+  return page.evaluate(() => [...document.querySelectorAll(".memory-block--event .event-preview")].map((preview) => ({
+    seed: preview.dataset.eventIdentitySeed,
+    cards: [...preview.querySelectorAll(".event-preview__item")].map((node) => ({
+      rotate: node.style.getPropertyValue("--event-rotate"),
+      x: node.style.getPropertyValue("--event-shelf-x"),
+      y: node.style.getPropertyValue("--event-shelf-y"),
+      layer: node.style.getPropertyValue("--event-layer"),
+      instance: node.querySelector(".image-frame")?.dataset.mediaInstanceKey || "",
+    })),
+  })));
+}
+
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await page.goto(`${base}/?opened=1`, { waitUntil: "networkidle" });
 
-  const event = page.locator(".memory-block--event").first();
+  const events = page.locator(".memory-block--event");
+  assert(await events.count() === 2, `Expected two same-day fixture events, got ${await events.count()}`);
+  const event = events.nth(0);
   await event.scrollIntoViewIfNeeded();
   const cards = event.locator(".event-preview__item");
   assert(await cards.count() === 13, `Expected 13 event cards, got ${await cards.count()}`);
+
+  const identityReport = await page.evaluate(() => {
+    const api = window.MEMORY_EVENT_LAYOUT;
+    if (!api) throw new Error("Event identity layout API is missing");
+    const chapter = window.MEMORY_BOOK.chapters[0];
+    const first = chapter.blocks[0];
+    const second = chapter.blocks[1];
+    const contextA = { chapterId: chapter.id, chapterIndex: 0, blockIndex: 0 };
+    const contextB = { chapterId: chapter.id, chapterIndex: 0, blockIndex: 1 };
+    const keyA = api.eventIdentityKey(first, contextA);
+    const keyARepeat = api.eventIdentityKey(first, contextA);
+    const keyB = api.eventIdentityKey(second, contextB);
+
+    const reordered = { ...first, items: [...first.items].reverse() };
+    const textEdited = {
+      ...first,
+      title: "Полностью другое название",
+      caption: "Полностью другая подпись",
+      items: first.items.map((item) => ({ ...item, caption: `Новый текст ${item.id}` })),
+    };
+    const withExtraMedia = {
+      ...first,
+      items: [...first.items, {
+        id: "new-media",
+        kind: "photo",
+        src: "preview/demo-media/new.jpg",
+        takenAt: "2026-07-10T23:59:00",
+      }],
+    };
+    const differentChapter = { ...contextA, chapterId: "year-2027" };
+    const noIdA = {
+      type: "event",
+      title: "Одинаковая дата",
+      items: [{ id: "no-id-a", src: "media/a.jpg", takenAt: "2026-07-10T12:00:00", kind: "photo" }],
+    };
+    const noIdB = {
+      type: "event",
+      title: "Одинаковая дата",
+      items: [{ id: "no-id-b", src: "media/b.jpg", takenAt: "2026-07-10T12:00:00", kind: "photo" }],
+    };
+    const empty = { type: "event", title: "Пустое событие", items: [] };
+
+    const stressCount = 12000;
+    const identityKeys = new Set();
+    const layoutSignatures = new Set();
+    let boundsValid = true;
+    for (let index = 0; index < stressCount; index += 1) {
+      const synthetic = {
+        type: "event",
+        id: `synthetic-event-${index}`,
+        date: "2026-07-10T12:00:00",
+        items: [
+          {
+            id: `synthetic-media-${index}`,
+            src: `media/generated/photos/${index}.jpg`,
+            thumb: `media/generated/thumbs/${index}.jpg`,
+            takenAt: `2026-07-10T12:${String(index % 60).padStart(2, "0")}:00`,
+            kind: "photo",
+          },
+          {
+            id: `synthetic-media-${index}-b`,
+            src: `media/generated/photos/${index}-b.jpg`,
+            takenAt: "2026-07-10T13:00:00",
+            kind: "photo",
+          },
+        ],
+      };
+      const key = api.eventIdentityKey(synthetic, {
+        chapterId: `year-${2023 + (index % 4)}`,
+        chapterIndex: index % 4,
+        blockIndex: index,
+      });
+      identityKeys.add(key);
+      const layouts = Array.from({ length: 4 }, (_, cardIndex) => api.cardLayout(key, cardIndex));
+      layoutSignatures.add(JSON.stringify(layouts));
+      if (index < 1500) {
+        for (let cardIndex = 0; cardIndex < 12; cardIndex += 1) {
+          const layout = api.cardLayout(key, cardIndex);
+          const column = cardIndex % 4;
+          const baseX = [.5, .16, -.16, -.5][column];
+          const baseY = [.35, -.25, .15, -.2][column];
+          if (
+            !Number.isFinite(layout.rotate) || Math.abs(layout.rotate) < .84 || Math.abs(layout.rotate) > 5.61 ||
+            !Number.isFinite(layout.x) || layout.x < baseX - .141 || layout.x > baseX + .141 ||
+            !Number.isFinite(layout.y) || layout.y < baseY - .301 || layout.y > baseY + .301 ||
+            !Number.isInteger(layout.layer) || layout.layer < 2 || layout.layer > 5
+          ) boundsValid = false;
+        }
+      }
+    }
+
+    const previews = [...document.querySelectorAll(".memory-block--event .event-preview")];
+    const readDomLayout = (preview) => [...preview.querySelectorAll(".event-preview__item")].slice(0, 4).map((node) => ({
+      rotate: Number.parseFloat(node.style.getPropertyValue("--event-rotate")),
+      x: Number.parseFloat(node.style.getPropertyValue("--event-shelf-x")),
+      y: Number.parseFloat(node.style.getPropertyValue("--event-shelf-y")),
+      layer: Number.parseInt(node.style.getPropertyValue("--event-layer"), 10),
+    }));
+
+    return {
+      keyA,
+      keyARepeat,
+      keyB,
+      keyReordered: api.eventIdentityKey(reordered, { ...contextA, blockIndex: 99 }),
+      keyTextEdited: api.eventIdentityKey(textEdited, contextA),
+      keyExtraMedia: api.eventIdentityKey(withExtraMedia, contextA),
+      keyDifferentChapter: api.eventIdentityKey(first, differentChapter),
+      keyNoIdA: api.eventIdentityKey(noIdA, contextA),
+      keyNoIdB: api.eventIdentityKey(noIdB, contextA),
+      keyEmptyA: api.eventIdentityKey(empty, { chapterId: chapter.id, chapterIndex: 0, blockIndex: 20 }),
+      keyEmptyB: api.eventIdentityKey(empty, { chapterId: chapter.id, chapterIndex: 0, blockIndex: 21 }),
+      expectedLayoutA: Array.from({ length: 4 }, (_, index) => api.cardLayout(keyA, index)),
+      domSeedA: previews[0]?.dataset.eventIdentitySeed,
+      domSeedB: previews[1]?.dataset.eventIdentitySeed,
+      domLayoutA: readDomLayout(previews[0]),
+      identityCount: identityKeys.size,
+      signatureCount: layoutSignatures.size,
+      stressCount,
+      boundsValid,
+      keyPatternValid: /^evt-[0-9a-f]{32}$/.test(keyA),
+    };
+  });
+
+  assert(identityReport.keyPatternValid, `Event identity is not a 128-bit hexadecimal key: ${identityReport.keyA}`);
+  assert(identityReport.keyA === identityReport.keyARepeat, "The same event changes identity between calculations");
+  assert(identityReport.keyA !== identityReport.keyB, "Same-day events with duplicated block IDs received the same identity");
+  assert(identityReport.keyA === identityReport.keyReordered, "Reordering media changed the event identity");
+  assert(identityReport.keyA === identityReport.keyTextEdited, "Editing titles or captions changed the event identity");
+  assert(identityReport.keyA !== identityReport.keyExtraMedia, "Adding media did not change the event identity");
+  assert(identityReport.keyA !== identityReport.keyDifferentChapter, "Moving an event to another chapter did not change its namespace");
+  assert(identityReport.keyNoIdA !== identityReport.keyNoIdB, "Events without block IDs collided despite different media");
+  assert(identityReport.keyEmptyA !== identityReport.keyEmptyB, "Empty fallback events collided");
+  assert(identityReport.identityCount === identityReport.stressCount,
+    `Identity collision in ${identityReport.stressCount} synthetic events: ${JSON.stringify(identityReport)}`);
+  assert(identityReport.signatureCount === identityReport.stressCount,
+    `Four-card layout collision in ${identityReport.stressCount} synthetic events: ${JSON.stringify(identityReport)}`);
+  assert(identityReport.boundsValid, "Generated layout escaped safe rotation, offset or layer bounds");
+  assert(identityReport.domSeedA === identityReport.keyA, "First rendered event does not use its composite identity");
+  assert(identityReport.domSeedB === identityReport.keyB, "Second rendered event does not use its composite identity");
+  assert(JSON.stringify(identityReport.domLayoutA) === JSON.stringify(identityReport.expectedLayoutA),
+    `Rendered cards do not use their event identity: ${JSON.stringify(identityReport)}`);
+
+  const instanceKeys = await cards.locator(".image-frame").evaluateAll((frames) => frames.map((frame) => frame.dataset.mediaInstanceKey));
+  assert(instanceKeys.every(Boolean), `A rendered card has no occurrence-aware media key: ${JSON.stringify(instanceKeys)}`);
+  assert(new Set(instanceKeys).size === 13,
+    `Duplicate media IDs caused a card to disappear or share an instance key: ${JSON.stringify(instanceKeys)}`);
+
+  const inlineLayouts = await cards.evaluateAll((nodes) => nodes.map((node) => ({
+    rotate: Number.parseFloat(node.style.getPropertyValue("--event-rotate")),
+    x: Number.parseFloat(node.style.getPropertyValue("--event-shelf-x")),
+    y: Number.parseFloat(node.style.getPropertyValue("--event-shelf-y")),
+    layer: Number.parseInt(node.style.getPropertyValue("--event-layer"), 10),
+  })));
+  assert(inlineLayouts.every((layout) => Object.values(layout).every(Number.isFinite)),
+    `A rendered card received NaN layout values: ${JSON.stringify(inlineLayouts)}`);
 
   const cardRects = await cards.evaluateAll((items) => items.slice(0, 5).map((node) => {
     const rect = node.getBoundingClientRect();
@@ -35,33 +205,6 @@ try {
   assert(overlaps.every((value) => value >= 8 && value <= 75), `Four-card row does not overlap gently: ${JSON.stringify({ cardRects, overlaps })}`);
   assert(cardRects[4].top > Math.min(...firstRow.map((rect) => rect.bottom)), "The fifth card did not start a second row");
   assert(previewBox.height > firstRow[0].height * 3, "Event preview did not grow for all four rows");
-
-  const seededLayout = await page.evaluate(() => {
-    const api = window.MEMORY_EVENT_LAYOUT;
-    if (!api) throw new Error("Date-seeded layout API is missing");
-    const preview = document.querySelector(".memory-block--event .event-preview");
-    const nodes = [...preview.querySelectorAll(".event-preview__item")].slice(0, 4);
-    const readNode = (node) => ({
-      rotate: Number.parseFloat(node.style.getPropertyValue("--event-rotate")),
-      x: Number.parseFloat(node.style.getPropertyValue("--event-shelf-x")),
-      y: Number.parseFloat(node.style.getPropertyValue("--event-shelf-y")),
-      layer: Number.parseInt(node.style.getPropertyValue("--event-layer"), 10),
-    });
-    const sameDateA = Array.from({ length: 4 }, (_, index) => api.cardLayout("2026-07-10", index));
-    const sameDateB = Array.from({ length: 4 }, (_, index) => api.cardLayout("2026-07-10", index));
-    const otherDate = Array.from({ length: 4 }, (_, index) => api.cardLayout("2026-07-11", index));
-    return {
-      seed: preview.dataset.eventDateSeed,
-      dom: nodes.map(readNode),
-      sameDateA,
-      sameDateB,
-      otherDate,
-    };
-  });
-  assert(seededLayout.seed === "2026-07-10", `Event seed was not derived from its date: ${JSON.stringify(seededLayout)}`);
-  assert(JSON.stringify(seededLayout.sameDateA) === JSON.stringify(seededLayout.sameDateB), "The same event date changes its layout between calculations");
-  assert(JSON.stringify(seededLayout.sameDateA) !== JSON.stringify(seededLayout.otherDate), "Different event dates received an identical layout");
-  assert(JSON.stringify(seededLayout.dom) === JSON.stringify(seededLayout.sameDateA), `Rendered cards do not use the date seed: ${JSON.stringify(seededLayout)}`);
 
   const firstCard = cards.nth(0);
   const caption = firstCard.locator(".event-preview__caption");
@@ -113,10 +256,20 @@ try {
   assert(captionState.scrollHeight > captionState.clientHeight, "Long fixture caption was not actually clamped");
   assert(captionState.width <= captionState.cardWidth * 0.8, "Caption is wider than the decorative lower rule");
 
-  await cards.nth(12).click();
-  await page.locator("#lightbox-counter").waitFor({ state: "visible" });
-  assert((await page.locator("#lightbox-counter").textContent())?.trim() === "13 / 13", "Last visible card did not open the thirteenth item");
-  await page.locator("#lightbox-close").click();
+  for (const [cardIndex, expectedCounter] of [[10, "11 / 13"], [11, "12 / 13"], [12, "13 / 13"]]) {
+    await cards.nth(cardIndex).click();
+    await page.locator("#lightbox-counter").waitFor({ state: "visible" });
+    assert((await page.locator("#lightbox-counter").textContent())?.trim() === expectedCounter,
+      `Card ${cardIndex + 1} opened the wrong gallery item`);
+    await page.locator("#lightbox-close").click();
+  }
+
+  const beforeReload = await readerLayoutSnapshot(page);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator(".memory-block--event").first().waitFor({ state: "attached" });
+  const afterReload = await readerLayoutSnapshot(page);
+  assert(JSON.stringify(beforeReload) === JSON.stringify(afterReload),
+    "Event identities or card layouts changed after a full page reload");
 
   const favicon = page.locator('link[rel="icon"]');
   assert(await favicon.count() === 1, "Offline favicon link is missing");
@@ -177,15 +330,25 @@ try {
 
   console.log(JSON.stringify({
     renderedCards: 13,
+    duplicateMediaInstancesPreserved: true,
+    sameDayEventsDiffer: true,
+    duplicatedBlockIdsDiffer: true,
+    orderIndependentIdentity: true,
+    textEditStableIdentity: true,
+    mediaSetSensitiveIdentity: true,
+    chapterNamespacedIdentity: true,
+    noIdFallbackIdentity: true,
+    emptyEventFallbackIdentity: true,
+    syntheticIdentityCollisionTest: 12000,
+    syntheticLayoutCollisionTest: 12000,
+    safeLayoutBounds: true,
+    fullReloadStability: true,
     overlappingFourCardRows: true,
-    dateSeededLayout: true,
-    stableSameDateLayout: true,
-    differentDatesDiffer: true,
     originalPolaroidSize: true,
     originalPaperMargins: true,
     captionBelowMedia: true,
     captionFourLineClamp: true,
-    lastCardOpensCorrectItem: true,
+    duplicateGalleryNavigation: true,
     offlineFavicon: true,
     typographyControls: true,
     oneClickProductionApply: true,
