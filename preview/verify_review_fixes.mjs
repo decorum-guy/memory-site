@@ -108,7 +108,7 @@ try {
   await studio.locator("#crop-cancel").click();
   await studio.close();
 
-  const range = await fetch(`${base}/preview/demo-media/order-video.mp4`, { headers: { Range: "bytes=64-127" } });
+  const range = await fetch(`${base}/preview/demo-media/order-video.webm`, { headers: { Range: "bytes=64-127" } });
   assert(range.status === 206, `Server ignored media byte range: HTTP ${range.status}`);
   assert(range.headers.get("content-range")?.startsWith("bytes 64-127/"), `Invalid Content-Range: ${range.headers.get("content-range")}`);
   assert((await range.arrayBuffer()).byteLength === 64, "Partial media response has wrong length");
