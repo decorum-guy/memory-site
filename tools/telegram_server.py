@@ -20,6 +20,7 @@ import shutil
 import threading
 import uuid
 import webbrowser
+from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Iterable
@@ -34,6 +35,7 @@ MEMORIES_FILE = ROOT / "content" / "memories.js"
 HOST = "127.0.0.1"
 PORT = 8765
 ALLOWED = {".png", ".jpg", ".jpeg", ".webp"}
+RANGE_MEDIA = {".mp4", ".mov", ".m4v", ".webm", ".mp3", ".m4a", ".wav", ".ogg"}
 MAX_BYTES = 35 * 1024 * 1024
 MAX_REQUEST_BYTES = 75 * 1024 * 1024
 
@@ -145,11 +147,7 @@ def normalize_state(value: Any) -> dict[str, Any]:
         value = {}
     raw_blocks = value.get("blocks")
     if isinstance(raw_blocks, list):
-        blocks = [
-            block
-            for index, raw in enumerate(raw_blocks)
-            if (block := normalize_block(raw, index)) is not None
-        ]
+        blocks = [block for index, raw in enumerate(raw_blocks) if (block := normalize_block(raw, index)) is not None]
     else:
         blocks = migrate_legacy_state(value)
     return {
@@ -172,7 +170,6 @@ def load_state() -> dict[str, Any]:
 def build_chapter(state: dict[str, Any]) -> tuple[dict[str, str], dict[str, Any]]:
     blocks: list[dict[str, Any]] = []
     modes: dict[str, str] = {}
-
     for index, item in enumerate(state.get("blocks", [])):
         shape = clamp_shape(item.get("shape"), index)
         rotate = (-1.2, .75, -0.45, 1.05, -0.8)[shape]
@@ -190,7 +187,6 @@ def build_chapter(state: dict[str, Any]) -> tuple[dict[str, str], dict[str, Any]
                 "layout": item.get("layout") if item.get("layout") in {"left", "right"} else "auto",
             })
             continue
-
         text = str(item.get("text") or "").strip()
         screenshot = str(item.get("screenshot") or "").strip()
         if not text and not screenshot:
@@ -210,7 +206,6 @@ def build_chapter(state: dict[str, Any]) -> tuple[dict[str, str], dict[str, Any]
             "shape": shape,
             "rotate": rotate,
         })
-
     chapter = {
         "id": "telegram",
         "number": "TG",
@@ -286,7 +281,6 @@ def apply_memory_book(text: str) -> dict[str, str]:
         if len(errors) > 12:
             detail += f"; и ещё {len(errors) - 12}"
         raise ValueError(detail)
-
     timestamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     backup = MEMORIES_FILE.with_name(f"memories.before-studio-{timestamp}.js")
     temporary = MEMORIES_FILE.with_name(f".memories.apply-{uuid.uuid4().hex}.tmp")
@@ -299,18 +293,15 @@ def apply_memory_book(text: str) -> dict[str, str]:
         temporary.unlink(missing_ok=True)
         shutil.copy2(backup, MEMORIES_FILE)
         raise
-
     chapters = book.get("chapters") or []
     first_id = str((chapters[0] if chapters else {}).get("id") or "memory-book")
     safe_id = re.sub(r"[^A-Za-z0-9_-]", "-", first_id)
-    return {
-        "backup": backup.relative_to(ROOT).as_posix(),
-        "bookUrl": f"/index.html?opened=1#{safe_id}",
-    }
+    return {"backup": backup.relative_to(ROOT).as_posix(), "bookUrl": f"/index.html?opened=1#{safe_id}"}
 
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self._range_remaining: int | None = None
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
     def log_message(self, format: str, *args: Any) -> None:
@@ -318,16 +309,14 @@ class Handler(SimpleHTTPRequestHandler):
 
     def end_headers(self) -> None:
         path = self.path.split("?", 1)[0]
+        if Path(path).suffix.lower() in RANGE_MEDIA:
+            self.send_header("Accept-Ranges", "bytes")
         no_cache = (
             path.startswith("/api/telegram/")
             or path.startswith("/api/memory/")
             or path in {
-                "/index.html",
-                "/tools/studio.html",
-                "/tools/telegram_studio.html",
-                "/content/memories.js",
-                "/content/telegram.js",
-                "/content/telegram-data.json",
+                "/index.html", "/tools/studio.html", "/tools/telegram_studio.html",
+                "/content/memories.js", "/content/telegram.js", "/content/telegram-data.json",
             }
         )
         if no_cache:
@@ -335,6 +324,79 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Pragma", "no-cache")
             self.send_header("Expires", "0")
         super().end_headers()
+
+    def send_head(self):
+        range_header = self.headers.get("Range")
+        if not range_header:
+            self._range_remaining = None
+            return super().send_head()
+
+        path = self.translate_path(self.path)
+        if os.path.isdir(path):
+            self._range_remaining = None
+            return super().send_head()
+        try:
+            source = open(path, "rb")
+        except OSError:
+            self.send_error(HTTPStatus.NOT_FOUND, "File not found")
+            return None
+
+        try:
+            size = os.fstat(source.fileno()).st_size
+            match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header.strip())
+            if not match or size <= 0:
+                raise ValueError
+            start_raw, end_raw = match.groups()
+            if not start_raw and not end_raw:
+                raise ValueError
+            if not start_raw:
+                suffix = int(end_raw)
+                if suffix <= 0:
+                    raise ValueError
+                start = max(0, size - suffix)
+                end = size - 1
+            else:
+                start = int(start_raw)
+                end = int(end_raw) if end_raw else size - 1
+            if start < 0 or start >= size or end < start:
+                raise ValueError
+            end = min(end, size - 1)
+            length = end - start + 1
+            source.seek(start)
+            self._range_remaining = length
+            self.send_response(HTTPStatus.PARTIAL_CONTENT)
+            self.send_header("Content-Type", self.guess_type(path))
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+            self.send_header("Content-Length", str(length))
+            self.send_header("Last-Modified", self.date_time_string(os.fstat(source.fileno()).st_mtime))
+            self.end_headers()
+            return source
+        except ValueError:
+            source.close()
+            self._range_remaining = None
+            self.send_response(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+            self.send_header("Content-Range", f"bytes */{os.path.getsize(path)}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return None
+        except Exception:
+            source.close()
+            raise
+
+    def copyfile(self, source, outputfile) -> None:
+        remaining = self._range_remaining
+        if remaining is None:
+            super().copyfile(source, outputfile)
+            return
+        try:
+            while remaining > 0:
+                chunk = source.read(min(128 * 1024, remaining))
+                if not chunk:
+                    break
+                outputfile.write(chunk)
+                remaining -= len(chunk)
+        finally:
+            self._range_remaining = None
 
     def send_json(self, value: Any, status: int = 200) -> None:
         payload = json.dumps(value, ensure_ascii=False).encode("utf-8")
@@ -395,7 +457,6 @@ class Handler(SimpleHTTPRequestHandler):
         content = base64.b64decode(raw, validate=True)
         if not content or len(content) > MAX_BYTES:
             raise ValueError("Файл пустой или превышает 35 МБ")
-
         MEDIA_DIR.mkdir(parents=True, exist_ok=True)
         target = unique_path(name)
         target.write_bytes(content)
@@ -405,7 +466,6 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception:
             target.unlink(missing_ok=True)
             raise ValueError("Файл не является читаемым изображением")
-
         relative = target.relative_to(ROOT).as_posix()
         self.send_json({
             "src": relative,
