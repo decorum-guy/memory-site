@@ -35,6 +35,23 @@ async function setRange(page, selector, value) {
   }, value);
 }
 
+async function waitForFrameSelection(page, expected) {
+  await page.waitForFunction((target) => {
+    const range = document.getElementById("frame-range");
+    const video = document.getElementById("frame-video");
+    const state = window.MEMORY_FRAME_PICKER?.getState?.();
+    return Boolean(
+      range
+      && video
+      && state
+      && state.pendingTime === null
+      && Math.abs(Number(range.value) - target) <= .08
+      && Math.abs(state.draftTime - target) <= .08
+      && Math.abs(video.currentTime - target) <= .4
+    );
+  }, expected, { timeout: 15000 });
+}
+
 try {
   const reader = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   reader.setDefaultTimeout(15000);
@@ -212,8 +229,38 @@ try {
   await studio.locator("#open-frame-picker").click();
   await studio.locator("#frame-view").waitFor({ state: "visible" });
   await waitForVideoMetadata(studio.locator("#frame-video"));
+  assert(await studio.evaluate(() => Boolean(window.MEMORY_FRAME_PICKER?.getState)), "Stable frame-picker controller is missing");
 
+  const playbackStarted = await studio.locator("#frame-video").evaluate(async (video) => {
+    try { await video.play(); } catch {}
+    return !video.paused;
+  });
+  assert(playbackStarted, "Frame-picker video could not start for seek-while-playing verification");
+  await studio.waitForTimeout(120);
+
+  // Two immediate range changes reproduce the browser race that previously let
+  // an older timeupdate/seeked event reset the control to the beginning.
+  await setRange(studio, "#frame-range", 1.4);
   await setRange(studio, "#frame-range", 2.1);
+  const immediateFrameState = await studio.evaluate(() => ({
+    range: Number(document.getElementById("frame-range")?.value),
+    label: document.getElementById("frame-current")?.textContent,
+    ...window.MEMORY_FRAME_PICKER.getState(),
+  }));
+  assert(immediateFrameState.paused, `Dragging the frame slider did not pause playback: ${JSON.stringify(immediateFrameState)}`);
+  assert(Math.abs(immediateFrameState.range - 2.1) <= .08, `Slider immediately jumped away from the newest target: ${JSON.stringify(immediateFrameState)}`);
+
+  await waitForFrameSelection(studio, 2.1);
+  await studio.waitForTimeout(350);
+  const settledFrameState = await studio.evaluate(() => ({
+    range: Number(document.getElementById("frame-range")?.value),
+    label: document.getElementById("frame-current")?.textContent,
+    ...window.MEMORY_FRAME_PICKER.getState(),
+  }));
+  assert(Math.abs(settledFrameState.range - 2.1) <= .08, `Slider returned to zero after asynchronous media events: ${JSON.stringify(settledFrameState)}`);
+  assert(Math.abs(settledFrameState.draftTime - 2.1) <= .08, `Draft frame time was lost: ${JSON.stringify(settledFrameState)}`);
+  assert(settledFrameState.pendingTime === null, `Latest frame seek never settled: ${JSON.stringify(settledFrameState)}`);
+
   await studio.locator("#frame-save").click();
   await studio.locator("#crop-view").waitFor({ state: "visible" });
   const cropVideo = studio.locator("#crop-stage video");
@@ -225,13 +272,20 @@ try {
 
   await studio.locator("#open-frame-picker").click();
   await waitForVideoMetadata(studio.locator("#frame-video"));
+  await waitForFrameSelection(studio, 2.1);
   await setRange(studio, "#frame-range", 3.1);
+  await studio.waitForTimeout(250);
+  const unsavedFrameValue = Number(await studio.locator("#frame-range").inputValue());
+  assert(Math.abs(unsavedFrameValue - 3.1) <= .08, `Second non-zero selection jumped away before cancel: ${unsavedFrameValue}`);
   await studio.locator("#frame-cancel").click();
   await studio.locator("#open-frame-picker").click();
   await waitForVideoMetadata(studio.locator("#frame-video"));
+  await waitForFrameSelection(studio, 2.1);
   const restoredFrameValue = Number(await studio.locator("#frame-range").inputValue());
   assert(Math.abs(restoredFrameValue - 2.1) <= .4, `frame cancel did not restore committed time: ${restoredFrameValue}`);
 
+  // Save immediately, without waiting for the physical seek to finish. The
+  // selected slider value must win over a stale currentTime from the video.
   await setRange(studio, "#frame-range", 2.6);
   await studio.locator("#frame-save-exit").click();
   await studio.locator("#crop-dialog").waitFor({ state: "hidden" });
@@ -262,10 +316,15 @@ try {
     movedPosition,
     savedPosition,
     restoredCropAfterCancel,
+    immediateFrameState,
+    settledFrameState,
     restoredFrameValue,
     videoCropState,
     exportedCrop: true,
     exportedPosterTime: 2.6,
+    rapidSeekLatestWins: true,
+    sliderPausesPlayback: true,
+    immediateSaveUsesDraftTime: true,
     liveTimelineHidden: true,
   };
   await fs.writeFile(path.join(output, "report.json"), JSON.stringify(report, null, 2), "utf8");
