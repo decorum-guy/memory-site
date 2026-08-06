@@ -1,4 +1,5 @@
 (function () {
+  installStableFramePicker();
   installStudioTabs();
   installProductionApply();
   installIncrementalMediaImportAssets();
@@ -82,6 +83,148 @@
     baseRender();
     renderBookSettings();
   };
+
+  function installStableFramePicker() {
+    const legacyMetadataHandler = syncFramePickerMetadata;
+    const legacyTimeHandler = syncFramePickerTime;
+    const legacyStopFrameVideo = stopFrameVideo;
+
+    frameVideo.removeEventListener("loadedmetadata", legacyMetadataHandler);
+    frameVideo.removeEventListener("timeupdate", legacyTimeHandler);
+    frameVideo.removeEventListener("seeked", legacyTimeHandler);
+
+    let draftTime = 0;
+    let pendingSeek = null;
+    let metadataReady = false;
+    let initializedSource = "";
+    let seekSerial = 0;
+    const step = Math.max(.001, Number(frameRange.step) || .04);
+    const seekTolerance = Math.max(.08, step * 2.5);
+
+    const mediaDuration = () => {
+      if (Number.isFinite(frameVideo.duration) && frameVideo.duration > 0) return frameVideo.duration;
+      const fallback = Number(cropSession?.item?.duration);
+      return Number.isFinite(fallback) && fallback > 0 ? fallback : Number(frameRange.max) || 0;
+    };
+
+    const maxSelectableTime = () => {
+      const duration = mediaDuration();
+      return Math.max(0, duration > .001 ? duration - .001 : duration);
+    };
+
+    const safeTime = (value) => clamp(Number(value), 0, maxSelectableTime());
+
+    const paintTime = (value) => {
+      const safe = Number.isFinite(value) ? value : 0;
+      frameRange.value = String(safe);
+      frameCurrent.textContent = formatPreciseTime(safe);
+    };
+
+    const issueSeek = (value) => {
+      if (!metadataReady || frameView.hidden || !frameVideo.currentSrc) return;
+      const target = safeTime(value);
+      const serial = ++seekSerial;
+      pendingSeek = { target, serial };
+      try {
+        frameVideo.currentTime = target;
+      } catch (_) {
+        requestAnimationFrame(() => {
+          if (!pendingSeek || pendingSeek.serial !== serial || !metadataReady || frameView.hidden) return;
+          try { frameVideo.currentTime = pendingSeek.target; }
+          catch (_) { /* the browser will retry on the next metadata/seek event */ }
+        });
+      }
+    };
+
+    setFrameTime = function stableSetFrameTime(value) {
+      if (!Number.isFinite(value) || !cropSession || frameView.hidden) return;
+      frameVideo.pause();
+      draftTime = safeTime(value);
+      paintTime(draftTime);
+      issueSeek(draftTime);
+    };
+
+    syncFramePickerMetadata = function stableSyncFramePickerMetadata() {
+      if (!cropSession || frameView.hidden || !frameVideo.currentSrc) return;
+      const duration = mediaDuration();
+      frameRange.max = String(Math.max(.04, duration));
+      frameDuration.textContent = formatPreciseTime(duration);
+      metadataReady = true;
+
+      const source = frameVideo.currentSrc || frameVideo.src;
+      if (source !== initializedSource) {
+        initializedSource = source;
+        pendingSeek = null;
+        draftTime = safeTime(cropSession.posterTime ?? 0);
+        paintTime(draftTime);
+        issueSeek(draftTime);
+      }
+    };
+
+    syncFramePickerTime = function stableSyncFramePickerTime(mediaEvent) {
+      if (!cropSession || frameView.hidden || !metadataReady) return;
+      const current = Number.isFinite(frameVideo.currentTime) ? frameVideo.currentTime : 0;
+
+      if (pendingSeek) {
+        const target = pendingSeek.target;
+        if (Math.abs(current - target) <= seekTolerance) {
+          draftTime = target;
+          pendingSeek = null;
+          paintTime(draftTime);
+        } else if (mediaEvent?.type === "seeked") {
+          // A rapid second drag can finish an older seek after a newer target was
+          // selected. Reapply only the latest target and ignore the stale event.
+          issueSeek(target);
+        }
+        return;
+      }
+
+      draftTime = safeTime(current);
+      paintTime(draftTime);
+    };
+
+    saveFramePicker = function stableSaveFramePicker(exitAll) {
+      if (!cropSession) return;
+      const selected = pendingSeek?.target ?? draftTime;
+      cropSession.posterTime = Number.isFinite(selected) ? safeTime(selected) : 0;
+      stopFrameVideo();
+      cropSession.frameEntryTime = null;
+      if (exitAll) {
+        commitCropSession(true);
+        return;
+      }
+      cropView.hidden = false;
+      frameView.hidden = true;
+      rebuildCropMedia();
+    };
+
+    stopFrameVideo = function stableStopFrameVideo() {
+      metadataReady = false;
+      initializedSource = "";
+      pendingSeek = null;
+      draftTime = 0;
+      seekSerial++;
+      paintTime(0);
+      frameDuration.textContent = formatPreciseTime(0);
+      legacyStopFrameVideo();
+    };
+
+    frameVideo.addEventListener("loadedmetadata", syncFramePickerMetadata);
+    frameVideo.addEventListener("timeupdate", syncFramePickerTime);
+    frameVideo.addEventListener("seeked", syncFramePickerTime);
+
+    window.MEMORY_FRAME_PICKER = {
+      getState() {
+        return {
+          draftTime,
+          pendingTime: pendingSeek?.target ?? null,
+          metadataReady,
+          currentTime: Number.isFinite(frameVideo.currentTime) ? frameVideo.currentTime : 0,
+          paused: frameVideo.paused,
+        };
+      },
+    };
+  }
 
   function installStudioTabs() {
     const top = document.querySelector(".top");
