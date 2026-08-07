@@ -51,6 +51,17 @@ window.MEMORY_BOOK = {
       layout: "wide",
       theme: "ochre",
       blocks: [
+
+        {
+          type: "event",
+          id: "demo-single",
+          title: "Один тихий кадр",
+          caption: "Проверка компактной высоты события с одним файлом.",
+          layout: "collage",
+          items: [
+            { id: "single-01", kind: "photo", src: "preview/demo-media/photo-01.jpg", thumb: "preview/demo-media/photo-01.jpg", caption: "Один кадр тоже может быть целой страницей.", takenAt: "2023-10-02T20:14:00" }
+          ]
+        },
         {
           type: "event",
           id: "demo-day-one",
@@ -59,10 +70,10 @@ window.MEMORY_BOOK = {
           layout: "collage",
           items: [
             { id: "d01", kind: "photo", src: "preview/demo-media/photo-02.jpg", thumb: "preview/demo-media/photo-02.jpg", caption: "Сначала просто кофе.", takenAt: "2023-11-18T16:21:00" },
-            { id: "d02", kind: "photo", src: "preview/demo-media/photo-03.jpg", thumb: "preview/demo-media/photo-03.jpg", caption: "Потом мы решили идти пешком.", takenAt: "2023-11-18T16:44:00" },
+            { id: "d02", kind: "photo", src: "preview/demo-media/photo-03.jpg", thumb: "preview/demo-media/photo-03.jpg", caption: "Потом мы решили идти пешком.", takenAt: "2023-11-18T16:44:00", crop: { x: 24, y: 72 } },
             { id: "d03", kind: "photo", src: "preview/demo-media/photo-04.jpg", thumb: "preview/demo-media/photo-04.jpg", caption: "Кадр, который получился случайно.", takenAt: "2023-11-18T17:10:00" },
             { id: "d04", kind: "photo", src: "preview/demo-media/photo-05.jpg", thumb: "preview/demo-media/photo-05.jpg", caption: "Тот самый десерт.", takenAt: "2023-11-18T17:48:00", censored: true },
-            { id: "d05", kind: "video", src: "preview/demo-media/demo-video.mp4", poster: "preview/demo-media/video-poster.jpg", caption: "Четыре секунды абсолютного хаоса.", duration: 4, takenAt: "2023-11-18T18:02:00" },
+            { id: "d05", kind: "video", src: "preview/demo-media/demo-video.webm", poster: "preview/demo-media/video-poster.jpg", caption: "Четыре секунды абсолютного хаоса.", duration: 4, takenAt: "2023-11-18T18:02:00", crop: { x: 68, y: 34 }, posterTime: 1.2 },
             { id: "d06", kind: "photo", src: "preview/demo-media/photo-06.jpg", thumb: "preview/demo-media/photo-06.jpg", caption: "И спокойный финал дня.", takenAt: "2023-11-18T19:17:00" }
           ]
         },
@@ -88,7 +99,7 @@ window.MEMORY_BOOK = {
           id: "demo-trip",
           title: "Май 2025 · три дня у воды",
           caption: "Слишком много ветра, слишком мало сна и ощущение, что возвращаться ещё рано.",
-          layout: "stack",
+          layout: "collage",
           items: [
             { id: "t01", kind: "photo", src: "preview/demo-media/photo-07.jpg", thumb: "preview/demo-media/photo-07.jpg", caption: "Первый вечер.", takenAt: "2025-05-09T19:20:00" },
             { id: "t02", kind: "photo", src: "preview/demo-media/photo-08.jpg", thumb: "preview/demo-media/photo-08.jpg", caption: "Утро, когда мы всё-таки проснулись рано.", takenAt: "2025-05-10T08:14:00" },

@@ -1,0 +1,294 @@
+/* Reader layout corrections after production import review.
+   Loaded last so these rules intentionally win over decorative legacy layers. */
+
+/* A year chapter can be tens of thousands of pixels tall. Rotating the entire
+   element causes its bottom edge and all media to drift horizontally. Keep the
+   real sheet level; the already-rotated ::before/::after paper layers retain
+   the handmade scrapbook feeling without moving the content. */
+.memory-page:nth-child(even),
+.memory-page:nth-child(odd) {
+  transform: none;
+}
+
+/* Restore the accepted event-polaroid shell from media.css + round4-polish.css.
+   The complete-event work must change only the surrounding layout, not shrink
+   the card or remove its paper margins. */
+.event-preview__item {
+  box-sizing: border-box;
+  display: block;
+  aspect-ratio: 4 / 5;
+  padding: .55rem .55rem 2.65rem;
+  overflow: hidden;
+  background: #fffaf0;
+}
+.event-preview__item .image-frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+}
+
+/* Global type controls exported by Memory Studio. No setting means the original
+   responsive sizes remain untouched. */
+.event-heading__date {
+  font-size: var(--memory-event-date-size, clamp(1.3rem, 3vw, 2.25rem));
+}
+.event-heading .hand-caption {
+  font-size: var(--memory-event-caption-size, 1rem);
+}
+.event-preview__caption--short {
+  font-size: var(--memory-polaroid-caption-short-size, 1.08rem);
+}
+.event-preview__caption--medium {
+  font-size: var(--memory-polaroid-caption-medium-size, .86rem);
+}
+.event-preview__caption--long {
+  font-size: var(--memory-polaroid-caption-long-size, .69rem);
+}
+
+/* Captions stay inside the original lower paper strip. They never overlap the
+   photograph, never exceed the decorative rule and stop after four wrapped
+   lines with an ellipsis. */
+.event-preview__caption,
+.event-preview__caption--short,
+.event-preview__caption--medium,
+.event-preview__caption--long {
+  position: absolute;
+  z-index: 6;
+  left: 14%;
+  right: 14%;
+  bottom: 1.08rem;
+  width: auto;
+  height: auto;
+  max-height: 4.8em;
+  margin: 0;
+  display: -webkit-box;
+  align-items: initial;
+  justify-content: initial;
+  overflow: hidden;
+  color: #3d342c;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  pointer-events: none;
+}
+.event-preview__item::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: .62rem;
+  width: auto;
+  height: 1px;
+  margin: 0;
+  background: rgba(79, 63, 47, .28);
+}
+
+/* Every imported visual file is appended by event-page-expansion.js. Large
+   events grow vertically without a maximum height. Four desktop tracks remain,
+   while cards are deliberately wider than each track, creating the same gentle
+   overlap used by short scrapbook collages. */
+.event-layout-stack .event-preview {
+  min-height: clamp(22rem, 34vw, 30rem);
+  height: auto;
+  max-height: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: max-content;
+  align-items: start;
+  align-content: start;
+  column-gap: 0;
+  row-gap: clamp(1.8rem, 3.5vw, 3rem);
+  overflow: visible;
+  padding: clamp(2.5rem, 5vw, 4rem) clamp(.35rem, 1vw, .9rem) 4.5rem;
+}
+.event-layout-stack .event-preview::before {
+  inset: 2.5rem 1.5% 2.2rem;
+}
+.event-layout-stack .event-preview__item,
+.event-layout-stack .event-preview__item--1,
+.event-layout-stack .event-preview__item--2,
+.event-layout-stack .event-preview__item--3,
+.event-layout-stack .event-preview__item--4,
+.event-layout-stack .event-preview__item--5,
+.event-layout-stack .event-preview__item--6,
+.event-layout-stack .event-preview__item--7,
+.event-layout-stack .event-preview__item--8 {
+  position: relative;
+  inset: auto;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  width: calc(100% + clamp(1rem, 1.7vw, 1.55rem));
+  max-width: 18rem;
+  justify-self: center;
+  z-index: var(--event-layer, 2);
+  transform: translate(var(--event-shelf-x, 0), var(--event-shelf-y, 0)) rotate(var(--event-rotate));
+}
+.event-layout-stack .event-preview__item:nth-of-type(4n + 1) {
+  --event-shelf-x: .5rem;
+  --event-shelf-y: .45rem;
+  --event-layer: 2;
+}
+.event-layout-stack .event-preview__item:nth-of-type(4n + 2) {
+  --event-shelf-x: .16rem;
+  --event-shelf-y: -.35rem;
+  --event-layer: 4;
+}
+.event-layout-stack .event-preview__item:nth-of-type(4n + 3) {
+  --event-shelf-x: -.16rem;
+  --event-shelf-y: .15rem;
+  --event-layer: 3;
+}
+.event-layout-stack .event-preview__item:nth-of-type(4n) {
+  --event-shelf-x: -.5rem;
+  --event-shelf-y: -.2rem;
+  --event-layer: 2;
+}
+.event-layout-stack .event-preview__item:hover,
+.event-layout-stack .event-preview__item:focus-visible {
+  z-index: 70;
+  transform: translate(var(--event-shelf-x, 0), calc(var(--event-shelf-y, 0) - .35rem)) rotate(0) scale(1.035);
+}
+
+/* The location belongs above the media, never on top of it. A dedicated shell
+   keeps the badge aligned with the media edge and separates media, metadata and
+   Live Photo controls into independent rows. */
+.lightbox__figure {
+  width: min(100%, 1100px);
+  max-width: min(100%, 1100px);
+  max-height: calc(100vh - 5rem);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  row-gap: .42rem;
+  align-content: center;
+  justify-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: .25rem;
+}
+.lightbox__media-shell {
+  position: relative;
+  grid-column: 1;
+  grid-row: 1;
+  display: inline-grid;
+  grid-template-columns: minmax(0, auto);
+  grid-template-rows: auto minmax(0, 1fr);
+  justify-items: center;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+}
+.lightbox__location {
+  position: static;
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+  max-width: 100%;
+  margin: 0 0 .32rem;
+  padding: .46rem .68rem;
+  pointer-events: none;
+}
+.lightbox__image,
+.lightbox__video {
+  grid-column: 1;
+  grid-row: 2;
+  max-width: 100%;
+  max-height: min(66vh, calc(100vh - 15rem));
+}
+.lightbox__caption {
+  grid-column: 1;
+  grid-row: 2;
+  margin-top: .12rem;
+}
+.lightbox__live-controls {
+  position: static;
+  grid-column: 1;
+  grid-row: 3;
+  margin: .1rem 0 0;
+  transform: none;
+}
+.lightbox__live-controls .lightbox__live {
+  position: static;
+  left: auto;
+  bottom: auto;
+  margin: 0;
+  transform: none;
+}
+
+/* The censor card must not collapse when app.js hides the underlying image. */
+.lightbox__censor {
+  position: fixed;
+  inset: 0;
+}
+
+@media (max-width: 960px) {
+  .event-layout-stack .event-preview {
+    min-height: 40rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding-inline: .35rem;
+  }
+  .event-layout-stack .event-preview__item {
+    width: calc(100% + 1rem);
+    max-width: 18rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .event-layout-stack .event-preview {
+    min-height: 34rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.6rem 0;
+    padding: 2rem .15rem 3.8rem;
+  }
+  .event-layout-stack .event-preview__item {
+    width: calc(100% + .6rem);
+    max-width: 16rem;
+  }
+}
+
+@media (max-width: 460px) {
+  .event-layout-stack .event-preview {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.2rem;
+  }
+  .event-layout-stack .event-preview__item {
+    width: min(100%, 16rem);
+  }
+}
+
+@media (max-width: 600px) {
+  .event-preview__caption,
+  .event-preview__caption--short,
+  .event-preview__caption--medium,
+  .event-preview__caption--long {
+    left: 12%;
+    right: 12%;
+  }
+  .event-preview__item::after {
+    left: 12%;
+    right: 12%;
+  }
+  .lightbox {
+    padding-top: 2.2rem;
+    padding-bottom: 3.8rem;
+  }
+  .lightbox__figure {
+    max-height: calc(100vh - 4.5rem);
+    row-gap: .35rem;
+  }
+  .lightbox__image,
+  .lightbox__video {
+    max-height: min(57vh, calc(100vh - 14rem));
+  }
+  .lightbox__location {
+    margin-bottom: .25rem;
+    padding: .42rem .58rem;
+  }
+}

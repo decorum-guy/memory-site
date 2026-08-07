@@ -1,0 +1,137 @@
+name: Complete event page verification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "assets/app.js"
+      - "assets/event-page-expansion.js"
+      - "assets/reader-layout-fixes.css"
+      - "assets/typography-settings.js"
+      - "assets/memory-book-icon.svg"
+      - "tools/studio-round4.js"
+      - "tools/studio-round4.css"
+      - "tools/telegram_server.py"
+      - "preview/verify_event_pages.mjs"
+      - ".github/workflows/event-page-functional.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare event identity and thirteen-item fixtures
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          mkdir -p preview/demo-media
+          cp preview/screenshots/01-cover-desktop.png preview/demo-media/photo-01.jpg
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          long_caption = (
+              "Это специально очень длинное описание карточки, которое должно переноситься внутри нижней полоски, "
+              "не заходить на фотографию и после четвёртой строки аккуратно заканчиваться многоточием. "
+              "ДажеОченьДлинноеСловоБезПробеловТожеОбязаноПеренестисьВнутриДопустимойШириныКарточки."
+          )
+          items = []
+          for index in range(13):
+              # Two different files intentionally share the same public id and
+              # source path. Reader must still render both instances.
+              item_id = "duplicate-media" if index in (10, 11) else f"large-{index + 1:02d}"
+              items.append({
+                  "id": item_id,
+                  "kind": "photo",
+                  "src": "preview/demo-media/photo-01.jpg",
+                  "thumb": "preview/demo-media/photo-01.jpg",
+                  "caption": long_caption if index == 0 else f"Карточка {index + 1}",
+                  "takenAt": f"2026-07-10T12:{index:02d}:00",
+                  "censored": False,
+              })
+
+          second_items = []
+          for index in range(4):
+              second_items.append({
+                  "id": f"same-day-other-{index + 1}",
+                  "kind": "photo",
+                  "src": "preview/demo-media/photo-01.jpg",
+                  "thumb": "preview/demo-media/photo-01.jpg",
+                  "caption": f"Другое событие {index + 1}",
+                  "takenAt": f"2026-07-10T18:{index:02d}:00",
+                  "censored": False,
+              })
+
+          book = {
+              "meta": {"title": "Проверка большой страницы", "accent": "#9c3f43"},
+              "chapters": [{
+                  "id": "year-2026",
+                  "number": "2026",
+                  "kicker": "Глава по времени",
+                  "title": "2026",
+                  "layout": "wide",
+                  "theme": "ochre",
+                  "blocks": [
+                      {
+                          "type": "event",
+                          "id": "large-event",
+                          "title": "10 июля 2026",
+                          "caption": "Все файлы должны быть видны без раскрытия.",
+                          "layout": "stack",
+                          "items": items,
+                      },
+                      {
+                          # The same date and even a duplicated block id must not
+                          # cause the same layout when the media set differs.
+                          "type": "event",
+                          "id": "large-event",
+                          "title": "10 июля 2026",
+                          "caption": "Второе отдельное событие того же дня.",
+                          "layout": "collage",
+                          "items": second_items,
+                      },
+                  ],
+              }],
+          }
+          Path("content/memories.js").write_text(
+              "window.MEMORY_BOOK = " + json.dumps(book, ensure_ascii=False, indent=2) + ";\n",
+              encoding="utf-8",
+          )
+          PY
+          python -m py_compile tools/telegram_server.py
+          node --check assets/event-page-expansion.js
+          node --check assets/typography-settings.js
+          node --check tools/studio-round4.js
+          node --check preview/verify_event_pages.mjs
+          test -f assets/memory-book-icon.svg
+
+      - name: Install Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund playwright@1.54.2
+          npx playwright install --with-deps chromium
+
+      - name: Verify complete event rendering and Studio apply
+        run: |
+          python3 tools/telegram_server.py >/tmp/memory-server.log 2>&1 &
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:8765/ >/dev/null && break
+            sleep 1
+          done
+          PREVIEW_URL=http://127.0.0.1:8765 node preview/verify_event_pages.mjs

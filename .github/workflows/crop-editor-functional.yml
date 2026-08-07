@@ -1,0 +1,170 @@
+name: Crop editor, cursor and For You functional verification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "assets/app.js"
+      - "assets/media.css"
+      - "assets/styles.css"
+      - "assets/production.css"
+      - "assets/preferences.js"
+      - "assets/shared-and-telegram.css"
+      - "assets/telegram-enhancements.js"
+      - "assets/round4-polish.css"
+      - "assets/round4-polish.js"
+      - "assets/cursor-*.css"
+      - "assets/cursors/**"
+      - "content/telegram.js"
+      - "tools/studio.html"
+      - "tools/studio-round4.css"
+      - "tools/studio-round4.js"
+      - "tools/telegram_server.py"
+      - "tools/memory_server.py"
+      - "tools/telegram_studio.html"
+      - "preview/demo_memories.js"
+      - "preview/demo_telegram.js"
+      - "preview/verify_cursor_states.mjs"
+      - "preview/verify_crop_editor.mjs"
+      - "preview/verify_round3.mjs"
+      - "preview/verify_round4.mjs"
+      - "preview/verify_telegram_studio.mjs"
+      - "preview/verify_telegram_studio_round4.mjs"
+      - ".github/workflows/crop-editor-functional.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate For You builder
+        run: |
+          python -m pip install --disable-pip-version-check Pillow
+          python -m py_compile tools/telegram_server.py tools/memory_server.py tools/import_memories.py
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path("tools").resolve()))
+          import memory_server
+
+          state = memory_server.base.normalize_state({
+              "kicker": "Редактируемая фраза",
+              "title": "For You",
+              "subtitle": "Пожелания рядом",
+              "blocks": [
+                  {"type": "note", "text": "Первое пожелание", "shape": 4, "layout": "left"},
+                  {"type": "note", "text": "Второе пожелание", "shape": 2, "layout": "right"},
+              ],
+          })
+          modes, chapter = memory_server.base.build_chapter(state)
+          assert chapter["kicker"] == "Редактируемая фраза"
+          assert chapter["title"] == "For You"
+          assert chapter["number"] == "FY"
+          assert chapter["blocks"][0]["layout"] == "left"
+          assert chapter["blocks"][1]["layout"] == "right"
+          assert [block["telegramKind"] for block in chapter["blocks"]] == ["note", "note"]
+          assert modes == {}
+          print("For You builder: OK")
+          PY
+
+      - name: Generate demo media
+        run: |
+          python -m pip install --disable-pip-version-check qrcode
+          python preview/generate_demo_media.py
+          python preview/generate_extra_media.py
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          ffmpeg -hide_banner -loglevel error -y \
+            -loop 1 -i preview/demo-media/video-poster.jpg \
+            -vf "scale=1280:-2,zoompan=z='min(zoom+0.0008,1.08)':d=120:s=1280x854:fps=30" \
+            -t 4 -an -c:v libvpx-vp9 -b:v 0 -crf 34 -pix_fmt yuv420p \
+            preview/demo-media/demo-video.webm
+          cp preview/demo_memories.js content/memories.js
+          cp preview/demo_telegram.js content/telegram.js
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate browser scripts
+        run: |
+          node --check assets/telegram-enhancements.js
+          node --check assets/round4-polish.js
+          node --check tools/studio-round4.js
+          node --check preview/verify_cursor_states.mjs
+          node --check preview/verify_round3.mjs
+          node --check preview/verify_round4.mjs
+          node --check preview/verify_telegram_studio.mjs
+          node --check preview/verify_telegram_studio_round4.mjs
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          for source, target in [
+              ("tools/telegram_studio.html", "/tmp/for-you-studio.js"),
+              ("tools/studio.html", "/tmp/memory-studio.js"),
+          ]:
+              text = Path(source).read_text(encoding="utf-8")
+              matches = re.findall(r"<script(?:\s[^>]*)?>\s*([\s\S]*?)\s*</script>", text)
+              inline = "\n".join(script for script in matches if script.strip())
+              assert inline, f"Inline script not found in {source}"
+              Path(target).write_text(inline, encoding="utf-8")
+          PY
+          node --check /tmp/for-you-studio.js
+          node --check /tmp/memory-studio.js
+
+      - name: Install Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund playwright@1.54.2
+          npx playwright install --with-deps chromium
+
+      - name: Run reader verification
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/memory-site-server.log 2>&1 &
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:4173/ >/dev/null && break
+            sleep 1
+          done
+          node preview/verify_cursor_states.mjs
+          node preview/verify_round3.mjs
+          node preview/verify_round4.mjs
+          node preview/verify_crop_editor.mjs
+
+      - name: Run For You Studio end-to-end verification
+        run: |
+          rm -f content/telegram-data.json
+          python tools/memory_server.py >/tmp/for-you-studio-server.log 2>&1 &
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:8765/api/telegram/state >/dev/null && break
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8765/api/telegram/state >/dev/null || {
+            cat /tmp/for-you-studio-server.log
+            exit 1
+          }
+          node preview/verify_telegram_studio.mjs
+          rm -f content/telegram-data.json
+          node preview/verify_telegram_studio_round4.mjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: round-4-functional-report
+          path: preview/crop-verification-output
+          if-no-files-found: warn
+          retention-days: 14

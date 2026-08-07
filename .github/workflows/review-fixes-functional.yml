@@ -1,0 +1,132 @@
+name: Reader interaction review fixes
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "assets/reader-interaction-fixes.css"
+      - "assets/reader-interaction-fixes.js"
+      - "assets/event-page-expansion.js"
+      - "assets/location-overlay.js"
+      - "tools/studio-round4.js"
+      - "tools/studio-crop-bounds.js"
+      - "tools/telegram_server.py"
+      - "tools/memory_server.py"
+      - "preview/verify_review_fixes.mjs"
+      - ".github/workflows/review-fixes-functional.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Prepare ordered media fixture
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          mkdir -p preview/demo-media
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+          import json
+
+          root = Path("preview/demo-media")
+          for index in range(1, 10):
+              image = Image.new("RGB", (1200, 900), (215 - index * 7, 198 - index * 4, 170 + index * 4))
+              draw = ImageDraw.Draw(image)
+              draw.text((80, 80), f"ORDER {index}", fill=(30, 25, 20))
+              image.save(root / f"order-{index:02d}.jpg", quality=90)
+
+          items = []
+          for index in range(9):
+              item = {
+                  "id": f"order-{index + 1:02d}",
+                  "kind": "photo",
+                  "src": f"preview/demo-media/order-{index + 1:02d}.jpg",
+                  "thumb": f"preview/demo-media/order-{index + 1:02d}.jpg",
+                  "caption": f"Порядок {index + 1}",
+                  "takenAt": f"2023-10-30T21:{index:02d}:00",
+                  "location": "Академика Анохина 2к4, Москва" if index == 0 else "",
+              }
+              items.append(item)
+          items[0].update({
+              "kind": "video",
+              "src": "preview/demo-media/order-video.webm",
+              "poster": "preview/demo-media/order-01.jpg",
+              "duration": 5,
+              "posterTime": 1.1,
+          })
+
+          book = {
+              "meta": {"title": "Ordered review fixture", "accent": "#9c3f43"},
+              "chapters": [{
+                  "id": "year-2023",
+                  "number": "2023",
+                  "kicker": "Глава по времени",
+                  "title": "2023",
+                  "layout": "wide",
+                  "theme": "ochre",
+                  "blocks": [{
+                      "type": "event",
+                      "id": "ordered-event",
+                      "title": "30 октября 2023",
+                      "caption": "Порядок важен",
+                      "layout": "collage",
+                      "items": items,
+                  }],
+              }],
+          }
+          Path("content/memories.js").write_text(
+              "window.MEMORY_BOOK = " + json.dumps(book, ensure_ascii=False, indent=2) + ";\n",
+              encoding="utf-8",
+          )
+          PY
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          ffmpeg -hide_banner -loglevel error -y \
+            -loop 1 -i preview/demo-media/order-01.jpg \
+            -vf "scale=1200:900,zoompan=z='min(zoom+0.001,1.06)':d=150:s=1200x900:fps=30" \
+            -t 5 -an -c:v libvpx-vp9 -b:v 0 -crf 34 -pix_fmt yuv420p \
+            preview/demo-media/order-video.webm
+          python -m py_compile tools/telegram_server.py tools/memory_server.py
+          node --check assets/reader-interaction-fixes.js
+          node --check tools/studio-round4.js
+          node --check tools/studio-crop-bounds.js
+          node --check preview/verify_review_fixes.mjs
+
+      - name: Install Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund playwright@1.54.2
+          npx playwright install --with-deps chromium
+
+      - name: Run reader and Studio verification
+        run: |
+          python3 tools/memory_server.py >/tmp/memory-server.log 2>&1 &
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:8765/ >/dev/null && break
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8765/ >/dev/null || {
+            cat /tmp/memory-server.log
+            exit 1
+          }
+          PREVIEW_URL=http://127.0.0.1:8765 node preview/verify_review_fixes.mjs

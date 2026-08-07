@@ -4,27 +4,305 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Memory Studio</title>
+  <link rel="stylesheet" href="studio-round4.css" />
   <style>
-    :root { --paper:#f2eadb; --ink:#28231f; --accent:#9c3f43; --line:#d6c8b2; font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-    *{box-sizing:border-box} body{margin:0;background:#c9b89e;color:var(--ink)} button,input,textarea,select{font:inherit}
-    .top{position:sticky;top:0;z-index:100;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;padding:.8rem 1rem;background:rgba(35,31,27,.94);color:#fff;backdrop-filter:blur(12px)}
-    .top h1{margin:0 auto 0 0;font:700 1rem Georgia,serif}.top button,.top label{border:0;padding:.65rem .85rem;background:#f5ecdd;color:#27231f;cursor:pointer;font-weight:750}.top .primary{background:var(--accent);color:#fff}.top input[type=file]{display:none}
-    .status{width:100%;font-size:.76rem;color:#d8cebf}
-    main{width:min(1500px,calc(100% - 2rem));margin:1rem auto 5rem}.intro{padding:1rem 1.2rem;background:#fff8ec;box-shadow:0 .6rem 1.4rem rgba(40,30,20,.12);line-height:1.5}.intro strong{color:var(--accent)}
-    .chapter{margin:1.2rem 0;background:var(--paper);box-shadow:0 1rem 2rem rgba(45,34,25,.18)}.chapter>summary{display:flex;gap:1rem;align-items:center;padding:1rem 1.2rem;cursor:pointer;font:700 1.25rem Georgia,serif}.chapter>summary small{margin-left:auto;font:500 .75rem Inter,sans-serif;color:#716557}.chapter-tools{display:flex;gap:.5rem;padding:0 1.2rem 1rem}.chapter-tools button{border:1px solid var(--line);background:#fff9ef;padding:.5rem .7rem;cursor:pointer}
-    .events{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr));gap:1rem;padding:0 1rem 1rem}.event{min-width:0;padding:.9rem;background:#fffaf1;border:1px solid #d7cab7;box-shadow:0 .5rem 1rem rgba(45,34,25,.1)}.event.dragover{outline:4px solid rgba(156,63,67,.35)}
-    .event-head{display:grid;grid-template-columns:1fr auto;gap:.5rem}.event-head input,.event-head textarea{width:100%;border:1px solid var(--line);background:#fff;padding:.55rem}.event-head textarea{grid-column:1/-1;min-height:3.5rem;resize:vertical}.event-actions{display:flex;gap:.35rem;align-items:start}.event-actions button{border:0;background:#e8ddca;padding:.45rem .55rem;cursor:pointer}.event-actions .danger{background:#f2d8d8;color:#7b2020}
-    .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:.55rem;margin-top:.8rem;min-height:7rem;padding:.25rem}.item{position:relative;min-width:0;padding:.35rem;background:#eee4d3;border:1px solid #cfc1aa;cursor:grab}.item.dragging{opacity:.35}.item.drop-before{box-shadow:-5px 0 0 var(--accent)}
-    .item-preview{position:relative;overflow:hidden;background:#b9ad9b}.item-preview img{display:block;width:100%;aspect-ratio:1;object-fit:cover}.item.is-censored .item-preview img{filter:blur(13px) saturate(.5) brightness(.72);transform:scale(1.12)}
-    .item input{width:100%;margin-top:.35rem;border:0;border-top:1px solid #c9bba5;background:#fff9ef;padding:.4rem;font-size:.72rem}.item-meta{position:absolute;left:.35rem;top:.35rem;z-index:3;padding:.2rem .35rem;border-radius:999px;background:rgba(20,18,16,.76);color:#fff;font-size:.58rem;font-weight:800}.item-tools{display:flex;gap:.3rem;margin-top:.35rem}.item-tools button{position:static;flex:1;border:0;padding:.38rem .25rem;background:#ded1bc;cursor:pointer;font-size:.65rem;font-weight:750}.item-tools .censor-on{background:#302b27;color:#fff}.item-tools .remove{flex:0 0 2rem;background:#f0d5d5;color:#741f1f}
-    .empty{grid-column:1/-1;padding:2rem;border:2px dashed #cbbda7;text-align:center;color:#7b7061}
-    dialog{width:min(540px,calc(100% - 2rem));border:0;padding:1rem;background:#fffaf1;box-shadow:0 2rem 5rem rgba(0,0,0,.35)}dialog::backdrop{background:rgba(24,20,17,.65)}dialog label{display:grid;gap:.35rem;margin:.8rem 0}dialog input,dialog textarea{width:100%;padding:.65rem;border:1px solid var(--line)}dialog textarea{min-height:8rem}dialog menu{display:flex;justify-content:flex-end;gap:.5rem;padding:0}
-    @media(max-width:650px){.events{grid-template-columns:1fr}.top h1{width:100%}.top{position:relative}}
+    :root {
+      --paper: #f2eadb;
+      --ink: #28231f;
+      --accent: #9c3f43;
+      --line: #d6c8b2;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #c9b89e; color: var(--ink); }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    [hidden] { display: none !important; }
+
+    .top {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      gap: .7rem;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: .8rem 1rem;
+      background: rgba(35, 31, 27, .95);
+      color: #fff;
+      backdrop-filter: blur(12px);
+    }
+    .top h1 { margin: 0 auto 0 0; font: 700 1rem Georgia, serif; }
+    .top button, .top label {
+      border: 0;
+      padding: .65rem .85rem;
+      background: #f5ecdd;
+      color: #27231f;
+      font-weight: 750;
+    }
+    .top .primary { background: var(--accent); color: #fff; }
+    .top input[type="file"] { display: none; }
+    .status { width: 100%; font-size: .76rem; color: #d8cebf; }
+
+    main { width: min(1500px, calc(100% - 2rem)); margin: 1rem auto 5rem; }
+    .intro, .button-guide {
+      padding: 1rem 1.2rem;
+      background: #fff8ec;
+      box-shadow: 0 .6rem 1.4rem rgba(40, 30, 20, .12);
+      line-height: 1.5;
+    }
+    .intro strong { color: var(--accent); }
+    .button-guide { margin-top: .8rem; }
+    .button-guide h2 { margin: 0 0 .7rem; font: 700 1rem Georgia, serif; }
+    .button-guide dl {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: .55rem 1rem;
+      margin: 0;
+    }
+    .button-guide div { display: grid; grid-template-columns: auto 1fr; gap: .5rem; }
+    .button-guide dt { font-weight: 850; }
+    .button-guide dd { margin: 0; color: #675c50; font-size: .82rem; }
+
+    .chapter { margin: 1.2rem 0; background: var(--paper); box-shadow: 0 1rem 2rem rgba(45, 34, 25, .18); }
+    .chapter > summary {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      padding: 1rem 1.2rem;
+      cursor: pointer;
+      font: 700 1.25rem Georgia, serif;
+    }
+    .chapter > summary small { margin-left: auto; font: 500 .75rem Inter, sans-serif; color: #716557; }
+    .chapter-tools { display: flex; gap: .5rem; padding: 0 1.2rem 1rem; }
+    .chapter-tools button { border: 1px solid var(--line); background: #fff9ef; padding: .5rem .7rem; }
+
+    .events {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr));
+      gap: 1rem;
+      padding: 0 1rem 1rem;
+    }
+    .event {
+      min-width: 0;
+      padding: .9rem;
+      background: #fffaf1;
+      border: 1px solid #d7cab7;
+      box-shadow: 0 .5rem 1rem rgba(45, 34, 25, .1);
+    }
+    .event.dragover { outline: 4px solid rgba(156, 63, 67, .35); }
+    .event-head { display: grid; grid-template-columns: 1fr auto; gap: .5rem; }
+    .event-head input, .event-head textarea { width: 100%; border: 1px solid var(--line); background: #fff; padding: .55rem; }
+    .event-head textarea { grid-column: 1 / -1; min-height: 3.5rem; resize: vertical; }
+    .event-actions { display: flex; gap: .35rem; align-items: start; }
+    .event-actions button { border: 0; background: #e8ddca; padding: .45rem .55rem; }
+    .event-actions .danger { background: #f2d8d8; color: #7b2020; }
+
+    .items {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: .7rem;
+      margin-top: .8rem;
+      min-height: 7rem;
+      padding: .25rem;
+    }
+    .item {
+      position: relative;
+      min-width: 0;
+      padding: .4rem;
+      background: #eee4d3;
+      border: 1px solid #cfc1aa;
+      cursor: grab;
+      transition: grid-column .2s ease;
+    }
+    .item.is-expanded { grid-column: span 2; }
+    .item.dragging { opacity: .35; }
+    .item.drop-before { box-shadow: -5px 0 0 var(--accent); }
+
+    .item-preview {
+      position: relative;
+      overflow: hidden;
+      aspect-ratio: 1;
+      background: #b9ad9b;
+    }
+    .item-preview > img,
+    .item-preview > video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+    }
+    .item-preview__missing {
+      display: none;
+      position: absolute;
+      inset: 0;
+      place-items: center;
+      padding: .7rem;
+      text-align: center;
+      color: #6b5e4e;
+      background: repeating-linear-gradient(135deg, #d7cbb8 0 10px, #cfc2ad 10px 20px);
+      font-size: .7rem;
+    }
+    .item-preview.is-missing > img,
+    .item-preview.is-missing > video { display: none; }
+    .item-preview.is-missing .item-preview__missing { display: grid; }
+    .item.is-censored .item-preview > img,
+    .item.is-censored .item-preview > video { filter: blur(13px) saturate(.5) brightness(.72); transform: scale(1.12); }
+    .item-meta {
+      position: absolute;
+      left: .35rem;
+      top: .35rem;
+      z-index: 3;
+      padding: .2rem .35rem;
+      border-radius: 999px;
+      background: rgba(20, 18, 16, .76);
+      color: #fff;
+      font-size: .58rem;
+      font-weight: 800;
+      pointer-events: none;
+    }
+    .crop-open {
+      position: absolute;
+      z-index: 5;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -42%);
+      border: 1px solid rgba(255,255,255,.7);
+      border-radius: 999px;
+      padding: .48rem .65rem;
+      color: #fff;
+      background: rgba(28, 24, 21, .86);
+      box-shadow: 0 .5rem 1.2rem rgba(0,0,0,.28);
+      font-size: .66rem;
+      font-weight: 800;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .15s ease, transform .15s ease;
+    }
+    .item-preview:hover .crop-open,
+    .crop-open:focus-visible {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(-50%, -50%);
+    }
+
+    .item-fields { display: grid; gap: .35rem; margin-top: .35rem; }
+    .item-fields label { display: grid; gap: .2rem; }
+    .item-fields label > span { color: #756857; font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+    .item-fields input, .item-fields textarea { width: 100%; border: 1px solid #c9bba5; background: #fff9ef; padding: .42rem; font-size: .72rem; }
+    .item-fields textarea { min-height: 2.15rem; resize: vertical; }
+    .item.is-expanded .item-fields textarea { min-height: 8rem; }
+    .expand-caption { border: 0; padding: .38rem; background: #e7dac5; font-size: .65rem; font-weight: 800; }
+    .item-tools { display: flex; gap: .3rem; margin-top: .35rem; }
+    .item-tools button { position: static; flex: 1; border: 0; padding: .38rem .25rem; background: #ded1bc; font-size: .65rem; font-weight: 750; }
+    .item-tools .censor-on { background: #302b27; color: #fff; }
+    .item-tools .remove { flex: 0 0 2rem; background: #f0d5d5; color: #741f1f; }
+    .empty { grid-column: 1 / -1; padding: 2rem; border: 2px dashed #cbbda7; text-align: center; color: #7b7061; }
+
+    dialog {
+      width: min(540px, calc(100% - 2rem));
+      border: 0;
+      padding: 1rem;
+      background: #fffaf1;
+      box-shadow: 0 2rem 5rem rgba(0,0,0,.35);
+    }
+    dialog::backdrop { background: rgba(24,20,17,.65); }
+    dialog label { display: grid; gap: .35rem; margin: .8rem 0; }
+    dialog input, dialog textarea { width: 100%; padding: .65rem; border: 1px solid var(--line); }
+    dialog textarea { min-height: 8rem; }
+    dialog menu { display: flex; justify-content: flex-end; gap: .5rem; padding: 0; }
+
+    #crop-dialog {
+      width: min(960px, calc(100% - 2rem));
+      max-height: calc(100vh - 2rem);
+      padding: 0;
+      overflow: auto;
+      background: #e8ddca;
+    }
+    .crop-editor { padding: clamp(1rem, 3vw, 2rem); }
+    .crop-editor__header { display: flex; align-items: start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+    .crop-editor__header h2 { margin: 0; font: 700 clamp(1.4rem, 3vw, 2rem) Georgia, serif; }
+    .crop-editor__header p { margin: .35rem 0 0; color: #6f6253; font-size: .85rem; }
+    .crop-editor__close { border: 0; background: transparent; font-size: 2rem; line-height: 1; }
+    .crop-editor__body { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(230px, .62fr); gap: clamp(1rem, 3vw, 2rem); align-items: start; }
+    .polaroid-preview {
+      width: min(100%, 540px);
+      margin: 0 auto;
+      padding: clamp(.75rem, 2vw, 1.1rem) clamp(.75rem, 2vw, 1.1rem) clamp(2.6rem, 7vw, 4.4rem);
+      background: #fffaf0;
+      box-shadow: 0 1.3rem 3rem rgba(45, 31, 20, .28);
+      transform: rotate(-.4deg);
+    }
+    .crop-stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      overflow: hidden;
+      touch-action: none;
+      cursor: grab;
+      background: #b9ad9b;
+      user-select: none;
+    }
+    .crop-stage.is-dragging { cursor: grabbing; }
+    .crop-stage > img,
+    .crop-stage > video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      user-select: none;
+    }
+    .crop-stage__grid {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: .35;
+      background:
+        linear-gradient(90deg, transparent 33.1%, rgba(255,255,255,.9) 33.2% 33.5%, transparent 33.6% 66.4%, rgba(255,255,255,.9) 66.5% 66.8%, transparent 66.9%),
+        linear-gradient(transparent 33.1%, rgba(255,255,255,.9) 33.2% 33.5%, transparent 33.6% 66.4%, rgba(255,255,255,.9) 66.5% 66.8%, transparent 66.9%);
+    }
+    .crop-stage__loading { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; background: rgba(20,18,16,.55); font-weight: 800; }
+    .polaroid-preview__caption { margin: 1rem .4rem 0; overflow: hidden; color: #433a32; font: 600 1rem/1.3 Georgia, serif; text-overflow: ellipsis; white-space: nowrap; }
+    .crop-controls { display: grid; gap: .8rem; }
+    .crop-controls__position { padding: .8rem; border: 1px solid #cdbc9f; background: rgba(255,250,241,.68); font-size: .82rem; }
+    .crop-controls__position strong { display: block; margin-top: .25rem; font-size: 1rem; }
+    .crop-controls button { min-height: 2.65rem; border: 1px solid #bba98b; background: #fff9ef; font-weight: 800; }
+    .crop-controls .primary { border-color: var(--accent); color: #fff; background: var(--accent); }
+    .crop-controls .secondary { background: #2d2925; color: #fff; }
+    .crop-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; margin-top: .4rem; }
+    .crop-hint { margin: 0; color: #6e6255; font-size: .8rem; line-height: 1.5; }
+
+    .frame-picker { display: grid; gap: 1rem; }
+    .frame-picker__video-wrap { position: relative; overflow: hidden; background: #111; }
+    .frame-picker video { display: block; width: 100%; max-height: 58vh; background: #111; }
+    .frame-picker__timeline { display: grid; grid-template-columns: auto 1fr auto; gap: .75rem; align-items: center; }
+    .frame-picker__timeline input { min-width: 0; padding: 0; border: 0; }
+    .frame-picker__time { min-width: 4.2rem; font-variant-numeric: tabular-nums; font-size: .8rem; }
+    .frame-picker__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .65rem; }
+    .frame-picker__actions button { min-height: 2.65rem; border: 1px solid #bba98b; padding: .65rem 1rem; background: #fff9ef; font-weight: 800; }
+    .frame-picker__actions .primary { color: #fff; border-color: var(--accent); background: var(--accent); }
+    .frame-picker__actions .secondary { color: #fff; background: #2d2925; }
+
+    @media (max-width: 760px) {
+      .crop-editor__body { grid-template-columns: 1fr; }
+      .crop-controls { grid-template-columns: 1fr 1fr; }
+      .crop-controls__position, .crop-hint, .crop-actions { grid-column: 1 / -1; }
+      .frame-picker__timeline { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 650px) {
+      .events { grid-template-columns: 1fr; }
+      .top h1 { width: 100%; }
+      .top { position: relative; }
+      .item.is-expanded { grid-column: 1 / -1; }
+    }
   </style>
 </head>
 <body>
   <header class="top">
     <h1>Memory Studio</h1>
+    <button id="open-book">Открыть книгу ↗</button>
     <button id="undo">↶ Отменить</button>
     <button id="save-local">Сохранить черновик</button>
     <button id="restore-local">Вернуть черновик</button>
@@ -35,7 +313,21 @@
 
   <main>
     <section class="intro">
-      Автоматическая группировка — <strong>первый черновик, а не точная истина</strong>. Перетаскивай карточки между событиями и внутри события, меняй подписи. Кнопка «Скрыть» включает цензуру: в финальном сайте файл будет размыт и откроется только после предупреждения.
+      Автоматическая группировка — <strong>первый черновик, а не точная истина</strong>. Перетаскивай карточки между событиями и внутри события, меняй две отдельные сущности: автоматическую дату/время и человеческую подпись. «Скрыть» включает цензуру.
+    </section>
+    <section class="button-guide">
+      <h2>Что делают кнопки</h2>
+      <dl>
+        <div><dt>↑ / ↓</dt><dd>Передвигают целое событие выше или ниже.</dd></div>
+        <div><dt>⇧+</dt><dd>Объединяет событие с предыдущим.</dd></div>
+        <div><dt>× события</dt><dd>Убирает событие из книги; исходники остаются на диске.</dd></div>
+        <div><dt>Drag & Drop</dt><dd>Переставляет файл или переносит его в другое событие.</dd></div>
+        <div><dt>Настроить кадр</dt><dd>Открывает полароидный предпросмотр: изображение можно перетащить, а у видео — выбрать кадр по таймлайну.</dd></div>
+        <div><dt>Развернуть</dt><dd>Увеличивает карточку и поле длинной подписи.</dd></div>
+        <div><dt>Скрыть</dt><dd>Добавляет предупреждение и блюр в книге.</dd></div>
+        <div><dt>× файла</dt><dd>Убирает только этот файл из книги.</dd></div>
+        <div><dt>Черновик / экспорт</dt><dd>Черновик живёт в браузере; экспорт создаёт файл для применения к книге.</dd></div>
+      </dl>
     </section>
     <div id="workspace"></div>
   </main>
@@ -49,203 +341,699 @@
     </form>
   </dialog>
 
+  <dialog id="crop-dialog" aria-labelledby="crop-title">
+    <section class="crop-editor" id="crop-view">
+      <header class="crop-editor__header">
+        <div>
+          <h2 id="crop-title">Настроить кадр</h2>
+          <p>Перетаскивай изображение прямо внутри полароида.</p>
+        </div>
+        <button class="crop-editor__close" id="crop-close" type="button" aria-label="Закрыть">×</button>
+      </header>
+      <div class="crop-editor__body">
+        <figure class="polaroid-preview">
+          <div class="crop-stage" id="crop-stage">
+            <div class="crop-stage__grid" aria-hidden="true"></div>
+          </div>
+          <figcaption class="polaroid-preview__caption" id="crop-caption"></figcaption>
+        </figure>
+        <aside class="crop-controls">
+          <div class="crop-controls__position">Положение кадра<strong id="crop-position">X 50% · Y 50%</strong></div>
+          <button id="crop-center" type="button">Вернуть по центру</button>
+          <button class="secondary" id="open-frame-picker" type="button">Выбрать кадр видео</button>
+          <p class="crop-hint">Настройка сохраняется в <code>memories.js</code> и применяется к полароиду в самой книге. Исходный файл не изменяется.</p>
+          <div class="crop-actions">
+            <button id="crop-cancel" type="button">Отмена</button>
+            <button class="primary" id="crop-save" type="button">Сохранить</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="crop-editor frame-picker" id="frame-view" hidden>
+      <header class="crop-editor__header">
+        <div>
+          <h2>Выбрать кадр видео</h2>
+          <p>Кликни по таймлайну или перетащи ползунок. Видео можно запускать кликом.</p>
+        </div>
+      </header>
+      <div class="frame-picker__video-wrap">
+        <video id="frame-video" muted playsinline preload="auto"></video>
+      </div>
+      <div class="frame-picker__timeline">
+        <span class="frame-picker__time" id="frame-current">0:00.00</span>
+        <input id="frame-range" type="range" min="0" max="1" step="0.04" value="0" aria-label="Кадр видео" />
+        <span class="frame-picker__time" id="frame-duration">0:00.00</span>
+      </div>
+      <div class="frame-picker__actions">
+        <button id="frame-cancel" type="button">Отмена</button>
+        <button id="frame-save" type="button">Сохранить</button>
+        <button class="primary" id="frame-save-exit" type="button">Сохранить и выйти</button>
+      </div>
+    </section>
+  </dialog>
+
   <script src="../content/memories.js"></script>
   <script>
     "use strict";
 
-    let book = clone(window.MEMORY_BOOK || { meta:{}, chapters:[] });
+    let book = clone(window.MEMORY_BOOK || { meta: {}, chapters: [] });
     let dragged = null;
     let targetChapterIndex = 0;
+    let cropSession = null;
     const history = [];
+    const expandedItems = new Set();
+    const openChapters = new Set([book.chapters?.[0]?.id].filter(Boolean));
     const workspace = document.getElementById("workspace");
     const status = document.getElementById("status");
-    const dialog = document.getElementById("new-event-dialog");
+    const newEventDialog = document.getElementById("new-event-dialog");
+    const cropDialog = document.getElementById("crop-dialog");
+    const cropView = document.getElementById("crop-view");
+    const frameView = document.getElementById("frame-view");
+    const cropStage = document.getElementById("crop-stage");
+    const cropPosition = document.getElementById("crop-position");
+    const cropCaption = document.getElementById("crop-caption");
+    const frameVideo = document.getElementById("frame-video");
+    const frameRange = document.getElementById("frame-range");
+    const frameCurrent = document.getElementById("frame-current");
+    const frameDuration = document.getElementById("frame-duration");
+    const testMode = location.pathname.includes("/.memory-test/site/") || location.pathname.includes("/memory-test/site/");
+    const draftKey = testMode ? "memory-studio-draft-test" : "memory-studio-draft-production";
 
     normalizeBook();
     render();
+    bindCropEditor();
 
-    function clone(value){ return JSON.parse(JSON.stringify(value)); }
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
 
-    function normalizeBook(){
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, Number(value) || 0));
+    }
+
+    function round(value, digits = 2) {
+      const factor = 10 ** digits;
+      return Math.round(Number(value) * factor) / factor;
+    }
+
+    function normalizeCrop(item) {
+      return {
+        x: clamp(item?.crop?.x ?? 50, 0, 100),
+        y: clamp(item?.crop?.y ?? 50, 0, 100)
+      };
+    }
+
+    function normalizedPosterTime(item) {
+      if (item?.posterTime === null || item?.posterTime === undefined || item?.posterTime === "") return null;
+      const value = Number(item.posterTime);
+      return Number.isFinite(value) && value >= 0 ? value : null;
+    }
+
+    function normalizeBook() {
       book.chapters ||= [];
-      book.chapters.forEach((chapter, ci) => {
-        chapter.id ||= `chapter-${ci+1}`;
+      book.chapters.forEach((chapter, chapterIndex) => {
+        chapter.id ||= `chapter-${chapterIndex + 1}`;
         chapter.blocks ||= [];
         chapter.blocks = chapter.blocks.filter(Boolean);
-        chapter.blocks.forEach((block, ei) => {
-          if(block.type !== "event") return;
-          block.id ||= `event-${ci}-${ei}`;
+        chapter.blocks.forEach((block, eventIndex) => {
+          if (block.type !== "event") return;
+          block.id ||= `event-${chapterIndex}-${eventIndex}`;
           block.items ||= [];
-          block.layout ||= block.items.length > 7 ? "stack" : "collage";
-          block.items.forEach((item, ii) => {
-            item.id ||= `${block.id}-item-${ii}`;
+          block.layout ||= block.items.length > 8 ? "stack" : "collage";
+          block.items.forEach((item, itemIndex) => {
+            item.id ||= `${block.id}-item-${itemIndex}`;
             item.censored = item.censored === true;
+            if (isGeneratedDateCaption(item.caption, item.takenAt)) item.caption = "";
+            if (item.crop) item.crop = normalizeCrop(item);
+            const posterTime = normalizedPosterTime(item);
+            if (posterTime === null) delete item.posterTime;
+            else item.posterTime = posterTime;
           });
         });
       });
     }
 
-    function snapshot(){
+    function snapshot() {
       history.push(JSON.stringify(book));
-      if(history.length > 40) history.shift();
+      if (history.length > 40) history.shift();
     }
 
-    function render(){
+    function render() {
       workspace.innerHTML = "";
       book.chapters.forEach((chapter, chapterIndex) => workspace.appendChild(renderChapter(chapter, chapterIndex)));
-      const events = book.chapters.reduce((n,c)=>n+c.blocks.filter(b=>b.type==="event").length,0);
-      const items = book.chapters.reduce((n,c)=>n+c.blocks.reduce((m,b)=>m+(b.items?.length||0),0),0);
-      const censored = book.chapters.reduce((n,c)=>n+c.blocks.reduce((m,b)=>m+(b.items?.filter(i=>i.censored).length||0),0),0);
-      status.textContent = `${book.chapters.length} глав · ${events} событий · ${items} файлов · ${censored} скрыто`;
+      const events = book.chapters.reduce((count, chapter) => count + chapter.blocks.filter((block) => block.type === "event").length, 0);
+      const items = book.chapters.reduce((count, chapter) => count + chapter.blocks.reduce((sum, block) => sum + (block.items?.length || 0), 0), 0);
+      const censored = book.chapters.reduce((count, chapter) => count + chapter.blocks.reduce((sum, block) => sum + (block.items?.filter((item) => item.censored).length || 0), 0), 0);
+      status.textContent = `${testMode ? "TEST · " : "PRODUCTION · "}${book.chapters.length} глав · ${events} событий · ${items} файлов · ${censored} скрыто`;
     }
 
-    function renderChapter(chapter, chapterIndex){
+    function renderChapter(chapter, chapterIndex) {
       const details = document.createElement("details");
       details.className = "chapter";
-      details.open = chapterIndex === 0;
-      const events = chapter.blocks.filter(block => block.type === "event");
-      details.innerHTML = `<summary>${escapeHtml(chapter.title || `Глава ${chapterIndex+1}`)}<small>${events.length} событий</small></summary><div class="chapter-tools"><button data-add>＋ Добавить событие</button></div><div class="events"></div>`;
-      details.querySelector("[data-add]").addEventListener("click", () => { targetChapterIndex = chapterIndex; dialog.showModal(); });
+      details.open = openChapters.has(chapter.id) || (chapterIndex === 0 && openChapters.size === 0);
+      const events = chapter.blocks.filter((block) => block.type === "event");
+      details.innerHTML = `
+        <summary>${escapeHtml(chapter.title || `Глава ${chapterIndex + 1}`)}<small>${events.length} событий</small></summary>
+        <div class="chapter-tools"><button data-add>＋ Добавить событие</button></div>
+        <div class="events"></div>`;
+      details.addEventListener("toggle", () => {
+        if (details.open) openChapters.add(chapter.id);
+        else openChapters.delete(chapter.id);
+      });
+      details.querySelector("[data-add]").addEventListener("click", () => {
+        targetChapterIndex = chapterIndex;
+        newEventDialog.showModal();
+      });
       const container = details.querySelector(".events");
       events.forEach((event) => container.appendChild(renderEvent(event, chapterIndex, chapter.blocks.indexOf(event))));
-      if(!events.length) container.innerHTML = '<div class="empty">В этой главе пока нет событий.</div>';
+      if (!events.length) container.innerHTML = '<div class="empty">В этой главе пока нет событий.</div>';
       return details;
     }
 
-    function renderEvent(event, chapterIndex, blockIndex){
+    function renderEvent(event, chapterIndex, blockIndex) {
       const card = document.createElement("article");
       card.className = "event";
-      card.dataset.chapter = chapterIndex;
-      card.dataset.block = blockIndex;
       card.innerHTML = `
         <div class="event-head">
           <input data-title value="${escapeAttr(event.title || "Событие")}" aria-label="Название события" />
           <div class="event-actions">
-            <button data-up title="Выше">↑</button><button data-down title="Ниже">↓</button>
-            <button data-merge title="Объединить с предыдущим">⇧+</button><button class="danger" data-delete title="Удалить событие">×</button>
+            <button data-up title="Выше">↑</button>
+            <button data-down title="Ниже">↓</button>
+            <button data-merge title="Объединить с предыдущим">⇧+</button>
+            <button class="danger" data-delete title="Удалить событие">×</button>
           </div>
           <textarea data-caption aria-label="Подпись события">${escapeHtml(event.caption || "")}</textarea>
         </div>
         <div class="items"></div>`;
+
       const items = card.querySelector(".items");
       event.items.forEach((item, itemIndex) => items.appendChild(renderItem(item, chapterIndex, blockIndex, itemIndex)));
-      if(!event.items.length) items.innerHTML = '<div class="empty">Перетащи сюда фото или видео</div>';
+      if (!event.items.length) items.innerHTML = '<div class="empty">Перетащи сюда фото или видео</div>';
 
-      card.querySelector("[data-title]").addEventListener("change", e => { snapshot(); event.title = e.target.value; render(); });
-      card.querySelector("[data-caption]").addEventListener("change", e => { snapshot(); event.caption = e.target.value; render(); });
+      card.querySelector("[data-title]").addEventListener("change", (eventInput) => {
+        snapshot();
+        event.title = eventInput.target.value;
+        render();
+      });
+      card.querySelector("[data-caption]").addEventListener("change", (eventInput) => {
+        snapshot();
+        event.caption = eventInput.target.value;
+        render();
+      });
       card.querySelector("[data-up]").addEventListener("click", () => moveBlock(chapterIndex, blockIndex, -1));
       card.querySelector("[data-down]").addEventListener("click", () => moveBlock(chapterIndex, blockIndex, 1));
       card.querySelector("[data-merge]").addEventListener("click", () => mergePrevious(chapterIndex, blockIndex));
       card.querySelector("[data-delete]").addEventListener("click", () => deleteEvent(chapterIndex, blockIndex));
-      card.addEventListener("dragover", e => { e.preventDefault(); card.classList.add("dragover"); });
+      card.addEventListener("dragover", (dragEvent) => {
+        dragEvent.preventDefault();
+        card.classList.add("dragover");
+      });
       card.addEventListener("dragleave", () => card.classList.remove("dragover"));
-      card.addEventListener("drop", e => {
-        if(e.target.closest(".item")) return;
-        e.preventDefault(); card.classList.remove("dragover");
-        if(!dragged) return;
-        moveItem(dragged.chapterIndex, dragged.blockIndex, dragged.itemIndex, chapterIndex, blockIndex, event.items.length);
+      card.addEventListener("drop", (dropEvent) => {
+        if (dropEvent.target.closest(".item")) return;
+        dropEvent.preventDefault();
+        card.classList.remove("dragover");
+        if (dragged) moveItem(dragged.chapterIndex, dragged.blockIndex, dragged.itemIndex, chapterIndex, blockIndex, event.items.length);
       });
       return card;
     }
 
-    function renderItem(item, chapterIndex, blockIndex, itemIndex){
+    function createCardMedia(item) {
+      const crop = normalizeCrop(item);
+      const media = item.kind === "video" && normalizedPosterTime(item) !== null
+        ? document.createElement("video")
+        : document.createElement("img");
+      media.style.objectPosition = `${crop.x}% ${crop.y}%`;
+      media.setAttribute("aria-hidden", "true");
+
+      if (media.tagName === "VIDEO") {
+        media.muted = true;
+        media.playsInline = true;
+        media.preload = "metadata";
+        media.poster = resolveMediaPath(item.poster || "");
+        media.src = resolveMediaPath(item.src || "");
+        seekVideo(media, normalizedPosterTime(item));
+      } else {
+        media.loading = "lazy";
+        media.src = resolveMediaPath(item.thumb || item.poster || item.src || "");
+      }
+      return media;
+    }
+
+    function renderItem(item, chapterIndex, blockIndex, itemIndex) {
       const card = document.createElement("div");
-      card.className = `item${item.censored ? " is-censored" : ""}`;
+      card.className = `item${item.censored ? " is-censored" : ""}${expandedItems.has(item.id) ? " is-expanded" : ""}`;
       card.draggable = true;
-      const previewSrc = item.thumb || item.poster || item.src || "";
-      const kindLabel = item.kind === "live" ? "LIVE" : item.kind === "video" ? `VIDEO${item.duration ? ` · ${formatDuration(item.duration)}` : ""}` : "PHOTO";
+      const kind = item.kind === "live"
+        ? "LIVE"
+        : item.kind === "video"
+          ? `VIDEO${item.duration ? ` · ${formatDuration(item.duration)}` : ""}`
+          : "PHOTO";
       card.innerHTML = `
-        <div class="item-preview"><img loading="lazy" src="${escapeAttr(previewSrc)}" alt="" /><span class="item-meta">${escapeHtml(kindLabel)}</span></div>
-        <input value="${escapeAttr(item.caption || "")}" aria-label="Подпись файла" />
+        <div class="item-preview">
+          <span class="item-preview__missing">Не удалось открыть превью</span>
+          <span class="item-meta">${escapeHtml(kind)}</span>
+          <button class="crop-open" data-crop type="button">Настроить кадр</button>
+        </div>
+        <div class="item-fields">
+          <label><span>Дата и время</span><input data-taken type="datetime-local" value="${escapeAttr(toDatetimeLocal(item.takenAt))}" /></label>
+          <label><span>Подпись к кадру</span><textarea data-caption rows="1" placeholder="Например: тот самый вечер">${escapeHtml(item.caption || "")}</textarea></label>
+          <button class="expand-caption" data-expand type="button">${expandedItems.has(item.id) ? "Свернуть" : "Развернуть подпись"}</button>
+        </div>
         <div class="item-tools">
           <button data-censor class="${item.censored ? "censor-on" : ""}">${item.censored ? "Скрыто" : "Скрыть"}</button>
           <button data-remove class="remove" title="Убрать из книги">×</button>
         </div>`;
 
-      card.addEventListener("dragstart", () => { dragged = {chapterIndex,blockIndex,itemIndex}; card.classList.add("dragging"); });
-      card.addEventListener("dragend", () => { dragged = null; card.classList.remove("dragging"); document.querySelectorAll(".drop-before").forEach(el=>el.classList.remove("drop-before")); });
-      card.addEventListener("dragover", e => { e.preventDefault(); e.stopPropagation(); card.classList.add("drop-before"); });
-      card.addEventListener("dragleave", () => card.classList.remove("drop-before"));
-      card.addEventListener("drop", e => {
-        e.preventDefault(); e.stopPropagation(); card.classList.remove("drop-before");
-        if(!dragged) return;
-        moveItem(dragged.chapterIndex, dragged.blockIndex, dragged.itemIndex, chapterIndex, blockIndex, itemIndex);
+      const preview = card.querySelector(".item-preview");
+      const media = createCardMedia(item);
+      media.addEventListener("error", () => preview.classList.add("is-missing"));
+      media.addEventListener(media.tagName === "VIDEO" ? "loadeddata" : "load", () => preview.classList.remove("is-missing"));
+      preview.prepend(media);
+
+      card.addEventListener("dragstart", (dragEvent) => {
+        if (dragEvent.target.closest("input,textarea,button")) {
+          dragEvent.preventDefault();
+          return;
+        }
+        dragged = { chapterIndex, blockIndex, itemIndex };
+        card.classList.add("dragging");
       });
-      card.querySelector("input").addEventListener("change", e => { snapshot(); item.caption = e.target.value; render(); });
-      card.querySelector("[data-censor]").addEventListener("click", () => { snapshot(); item.censored = !item.censored; render(); });
+      card.addEventListener("dragend", () => {
+        dragged = null;
+        card.classList.remove("dragging");
+        document.querySelectorAll(".drop-before").forEach((element) => element.classList.remove("drop-before"));
+      });
+      card.addEventListener("dragover", (dragEvent) => {
+        dragEvent.preventDefault();
+        dragEvent.stopPropagation();
+        card.classList.add("drop-before");
+      });
+      card.addEventListener("dragleave", () => card.classList.remove("drop-before"));
+      card.addEventListener("drop", (dropEvent) => {
+        dropEvent.preventDefault();
+        dropEvent.stopPropagation();
+        card.classList.remove("drop-before");
+        if (dragged) moveItem(dragged.chapterIndex, dragged.blockIndex, dragged.itemIndex, chapterIndex, blockIndex, itemIndex);
+      });
+
+      card.querySelector("[data-taken]").addEventListener("change", (inputEvent) => {
+        snapshot();
+        item.takenAt = inputEvent.target.value ? `${inputEvent.target.value}:00` : "";
+      });
+      card.querySelector("[data-caption]").addEventListener("change", (inputEvent) => {
+        snapshot();
+        item.caption = inputEvent.target.value;
+      });
+      const expandButton = card.querySelector("[data-expand]");
+      expandButton.addEventListener("click", () => {
+        const expanded = !expandedItems.has(item.id);
+        if (expanded) expandedItems.add(item.id);
+        else expandedItems.delete(item.id);
+        card.classList.toggle("is-expanded", expanded);
+        expandButton.textContent = expanded ? "Свернуть" : "Развернуть подпись";
+      });
+      card.querySelector("[data-crop]").addEventListener("click", () => openCropEditor(item));
+      card.querySelector("[data-censor]").addEventListener("click", () => {
+        snapshot();
+        item.censored = !item.censored;
+        render();
+      });
       card.querySelector("[data-remove]").addEventListener("click", () => {
-        snapshot(); book.chapters[chapterIndex].blocks[blockIndex].items.splice(itemIndex,1); render();
+        snapshot();
+        book.chapters[chapterIndex].blocks[blockIndex].items.splice(itemIndex, 1);
+        render();
       });
       return card;
     }
 
-    function moveItem(fromChapter, fromBlock, fromItem, toChapter, toBlock, toIndex){
+    function bindCropEditor() {
+      document.getElementById("crop-close").addEventListener("click", cancelCropEditor);
+      document.getElementById("crop-cancel").addEventListener("click", cancelCropEditor);
+      document.getElementById("crop-save").addEventListener("click", () => commitCropSession(true));
+      document.getElementById("crop-center").addEventListener("click", () => {
+        if (!cropSession) return;
+        cropSession.crop = { x: 50, y: 50 };
+        applyCropPosition();
+      });
+      document.getElementById("open-frame-picker").addEventListener("click", openFramePicker);
+      document.getElementById("frame-cancel").addEventListener("click", cancelFramePicker);
+      document.getElementById("frame-save").addEventListener("click", () => saveFramePicker(false));
+      document.getElementById("frame-save-exit").addEventListener("click", () => saveFramePicker(true));
+      frameRange.addEventListener("input", () => setFrameTime(Number(frameRange.value)));
+      frameVideo.addEventListener("loadedmetadata", syncFramePickerMetadata);
+      frameVideo.addEventListener("timeupdate", syncFramePickerTime);
+      frameVideo.addEventListener("seeked", syncFramePickerTime);
+      frameVideo.addEventListener("click", () => {
+        if (frameVideo.paused) frameVideo.play().catch(() => {});
+        else frameVideo.pause();
+      });
+      cropDialog.addEventListener("cancel", (cancelEvent) => {
+        cancelEvent.preventDefault();
+        if (!frameView.hidden) cancelFramePicker();
+        else cancelCropEditor();
+      });
+
+      let dragState = null;
+      cropStage.addEventListener("pointerdown", (pointerEvent) => {
+        if (!cropSession || pointerEvent.button !== 0) return;
+        const rect = cropStage.getBoundingClientRect();
+        dragState = {
+          pointerId: pointerEvent.pointerId,
+          startClientX: pointerEvent.clientX,
+          startClientY: pointerEvent.clientY,
+          startX: cropSession.crop.x,
+          startY: cropSession.crop.y,
+          width: Math.max(1, rect.width),
+          height: Math.max(1, rect.height)
+        };
+        cropStage.setPointerCapture(pointerEvent.pointerId);
+        cropStage.classList.add("is-dragging");
+      });
+      cropStage.addEventListener("pointermove", (pointerEvent) => {
+        if (!dragState || !cropSession || dragState.pointerId !== pointerEvent.pointerId) return;
+        const deltaX = pointerEvent.clientX - dragState.startClientX;
+        const deltaY = pointerEvent.clientY - dragState.startClientY;
+        cropSession.crop.x = clamp(dragState.startX - deltaX / dragState.width * 100, 0, 100);
+        cropSession.crop.y = clamp(dragState.startY - deltaY / dragState.height * 100, 0, 100);
+        applyCropPosition();
+      });
+      const endDrag = (pointerEvent) => {
+        if (!dragState || dragState.pointerId !== pointerEvent.pointerId) return;
+        dragState = null;
+        cropStage.classList.remove("is-dragging");
+      };
+      cropStage.addEventListener("pointerup", endDrag);
+      cropStage.addEventListener("pointercancel", endDrag);
+    }
+
+    function openCropEditor(item) {
+      cropSession = {
+        item,
+        crop: normalizeCrop(item),
+        posterTime: normalizedPosterTime(item),
+        frameEntryTime: null
+      };
+      cropCaption.textContent = item.caption || formatTakenAt(item.takenAt) || "Без подписи";
+      document.getElementById("open-frame-picker").hidden = item.kind !== "video";
+      cropView.hidden = false;
+      frameView.hidden = true;
+      rebuildCropMedia();
+      cropDialog.showModal();
+    }
+
+    function cancelCropEditor() {
+      stopFrameVideo();
+      cropSession = null;
+      cropDialog.close();
+    }
+
+    function commitCropSession(closeAfter) {
+      if (!cropSession) return;
+      snapshot();
+      cropSession.item.crop = {
+        x: round(cropSession.crop.x),
+        y: round(cropSession.crop.y)
+      };
+      if (cropSession.posterTime === null) delete cropSession.item.posterTime;
+      else cropSession.item.posterTime = round(cropSession.posterTime, 3);
+      stopFrameVideo();
+      if (closeAfter) {
+        cropSession = null;
+        cropDialog.close();
+        render();
+      }
+    }
+
+    function rebuildCropMedia() {
+      if (!cropSession) return;
+      cropStage.querySelectorAll("img, video, .crop-stage__loading").forEach((element) => element.remove());
+      const item = cropSession.item;
+      let media;
+      if (item.kind === "video" && cropSession.posterTime !== null) {
+        media = document.createElement("video");
+        media.muted = true;
+        media.playsInline = true;
+        media.preload = "auto";
+        media.poster = resolveMediaPath(item.poster || "");
+        media.src = resolveMediaPath(item.src || "");
+        const loading = document.createElement("span");
+        loading.className = "crop-stage__loading";
+        loading.textContent = "Загружаю выбранный кадр…";
+        cropStage.prepend(loading);
+        media.addEventListener("loadeddata", () => loading.remove(), { once: true });
+        seekVideo(media, cropSession.posterTime);
+      } else {
+        media = document.createElement("img");
+        media.src = resolveMediaPath(item.thumb || item.poster || item.src || "");
+        media.alt = "Предпросмотр кадрирования";
+      }
+      media.dataset.cropMedia = "1";
+      cropStage.prepend(media);
+      applyCropPosition();
+    }
+
+    function applyCropPosition() {
+      if (!cropSession) return;
+      const media = cropStage.querySelector("[data-crop-media]");
+      if (media) media.style.objectPosition = `${cropSession.crop.x}% ${cropSession.crop.y}%`;
+      cropPosition.textContent = `X ${Math.round(cropSession.crop.x)}% · Y ${Math.round(cropSession.crop.y)}%`;
+    }
+
+    function openFramePicker() {
+      if (!cropSession || cropSession.item.kind !== "video") return;
+      cropSession.frameEntryTime = cropSession.posterTime;
+      cropView.hidden = true;
+      frameView.hidden = false;
+      stopFrameVideo();
+      frameVideo.poster = resolveMediaPath(cropSession.item.poster || "");
+      frameVideo.src = resolveMediaPath(cropSession.item.src || "");
+      frameVideo.load();
+    }
+
+    function cancelFramePicker() {
+      if (!cropSession) return;
+      stopFrameVideo();
+      cropView.hidden = false;
+      frameView.hidden = true;
+      cropSession.frameEntryTime = null;
+    }
+
+    function saveFramePicker(exitAll) {
+      if (!cropSession) return;
+      const selected = Number(frameVideo.currentTime);
+      cropSession.posterTime = Number.isFinite(selected) ? selected : 0;
+      stopFrameVideo();
+      cropSession.frameEntryTime = null;
+      if (exitAll) {
+        commitCropSession(true);
+        return;
+      }
+      cropView.hidden = false;
+      frameView.hidden = true;
+      rebuildCropMedia();
+    }
+
+    function syncFramePickerMetadata() {
+      if (!cropSession) return;
+      const duration = Number.isFinite(frameVideo.duration) ? frameVideo.duration : Number(cropSession.item.duration) || 0;
+      frameRange.max = String(Math.max(.04, duration));
+      frameDuration.textContent = formatPreciseTime(duration);
+      const initial = cropSession.posterTime ?? 0;
+      setFrameTime(Math.min(initial, Math.max(0, duration - .01)));
+    }
+
+    function syncFramePickerTime() {
+      const current = Number.isFinite(frameVideo.currentTime) ? frameVideo.currentTime : 0;
+      frameRange.value = String(current);
+      frameCurrent.textContent = formatPreciseTime(current);
+    }
+
+    function setFrameTime(value) {
+      if (!Number.isFinite(value)) return;
+      const max = Number.isFinite(frameVideo.duration) ? frameVideo.duration : Number(frameRange.max) || value;
+      const safe = clamp(value, 0, Math.max(0, max - .001));
+      try { frameVideo.currentTime = safe; }
+      catch (_) { /* metadata can arrive one tick later */ }
+      frameRange.value = String(safe);
+      frameCurrent.textContent = formatPreciseTime(safe);
+    }
+
+    function stopFrameVideo() {
+      frameVideo.pause();
+      frameVideo.removeAttribute("src");
+      frameVideo.load();
+    }
+
+    function seekVideo(video, time) {
+      const seek = () => {
+        const duration = Number.isFinite(video.duration) ? video.duration : Infinity;
+        const safe = Math.max(0, Math.min(Number(time) || 0, duration === Infinity ? Number(time) || 0 : Math.max(0, duration - .01)));
+        try { video.currentTime = safe; }
+        catch (_) { /* browser will retry after metadata */ }
+      };
+      if (video.readyState >= 1) seek();
+      else video.addEventListener("loadedmetadata", seek, { once: true });
+    }
+
+    function moveItem(fromChapter, fromBlock, fromItem, toChapter, toBlock, toIndex) {
       snapshot();
       const source = book.chapters[fromChapter].blocks[fromBlock].items;
       const target = book.chapters[toChapter].blocks[toBlock].items;
-      const [item] = source.splice(fromItem,1);
-      if(!item){ render(); return; }
-      if(source === target && fromItem < toIndex) toIndex--;
+      const [item] = source.splice(fromItem, 1);
+      if (!item) {
+        render();
+        return;
+      }
+      if (source === target && fromItem < toIndex) toIndex--;
       target.splice(Math.max(0, Math.min(toIndex, target.length)), 0, item);
       render();
     }
 
-    function moveBlock(chapterIndex, blockIndex, direction){
+    function moveBlock(chapterIndex, blockIndex, direction) {
       const blocks = book.chapters[chapterIndex].blocks;
       let next = blockIndex + direction;
-      while(next >= 0 && next < blocks.length && blocks[next].type !== "event") next += direction;
-      if(next < 0 || next >= blocks.length) return;
-      snapshot(); [blocks[blockIndex],blocks[next]]=[blocks[next],blocks[blockIndex]]; render();
+      while (next >= 0 && next < blocks.length && blocks[next].type !== "event") next += direction;
+      if (next < 0 || next >= blocks.length) return;
+      snapshot();
+      [blocks[blockIndex], blocks[next]] = [blocks[next], blocks[blockIndex]];
+      render();
     }
 
-    function mergePrevious(chapterIndex, blockIndex){
+    function mergePrevious(chapterIndex, blockIndex) {
       const blocks = book.chapters[chapterIndex].blocks;
       let previous = blockIndex - 1;
-      while(previous >= 0 && blocks[previous].type !== "event") previous--;
-      if(previous < 0) return;
-      snapshot(); blocks[previous].items.push(...(blocks[blockIndex].items || [])); blocks.splice(blockIndex,1); render();
+      while (previous >= 0 && blocks[previous].type !== "event") previous--;
+      if (previous < 0) return;
+      snapshot();
+      blocks[previous].items.push(...(blocks[blockIndex].items || []));
+      blocks.splice(blockIndex, 1);
+      render();
     }
 
-    function deleteEvent(chapterIndex, blockIndex){
+    function deleteEvent(chapterIndex, blockIndex) {
       const event = book.chapters[chapterIndex].blocks[blockIndex];
-      if(event.items?.length && !confirm("В событии есть файлы. Удалить их из книги? Исходники на диске останутся.")) return;
-      snapshot(); book.chapters[chapterIndex].blocks.splice(blockIndex,1); render();
+      if (event.items?.length && !confirm("В событии есть файлы. Удалить их из книги? Исходники останутся.")) return;
+      snapshot();
+      book.chapters[chapterIndex].blocks.splice(blockIndex, 1);
+      render();
     }
 
     document.getElementById("confirm-new-event").addEventListener("click", () => {
       snapshot();
-      book.chapters[targetChapterIndex].blocks.push({type:"event",id:`manual-${Date.now()}`,title:document.getElementById("new-event-title").value,caption:document.getElementById("new-event-caption").value,layout:"collage",items:[]});
-      setTimeout(render,0);
+      book.chapters[targetChapterIndex].blocks.push({
+        type: "event",
+        id: `manual-${Date.now()}`,
+        title: document.getElementById("new-event-title").value,
+        caption: document.getElementById("new-event-caption").value,
+        layout: "collage",
+        items: []
+      });
+      setTimeout(render, 0);
     });
 
+    document.getElementById("open-book").addEventListener("click", () => window.open("../index.html?opened=1", "_blank"));
     document.getElementById("undo").addEventListener("click", () => {
-      const previous = history.pop(); if(!previous) return; book=JSON.parse(previous); render();
+      const previous = history.pop();
+      if (previous) {
+        book = JSON.parse(previous);
+        normalizeBook();
+        render();
+      }
     });
     document.getElementById("save-local").addEventListener("click", () => {
-      try{localStorage.setItem("memory-studio-draft",JSON.stringify(book));status.textContent="Черновик сохранён в этом браузере.";}catch(error){status.textContent=`Не удалось сохранить: ${error.message}`;}
+      try {
+        localStorage.setItem(draftKey, JSON.stringify(book));
+        status.textContent = "Черновик сохранён в этом браузере.";
+      } catch (error) {
+        status.textContent = `Не удалось сохранить: ${error.message}`;
+      }
     });
     document.getElementById("restore-local").addEventListener("click", () => {
-      const value=localStorage.getItem("memory-studio-draft");if(!value)return;snapshot();book=JSON.parse(value);normalizeBook();render();
+      const value = localStorage.getItem(draftKey);
+      if (!value) return;
+      snapshot();
+      book = JSON.parse(value);
+      normalizeBook();
+      render();
     });
-    document.getElementById("load-file").addEventListener("change", async e => {
-      const file=e.target.files[0];if(!file)return;const text=await file.text();
-      const match=text.match(/window\.MEMORY_BOOK\s*=\s*([\s\S]*);\s*$/);
-      try{snapshot();book=JSON.parse(match?match[1]:text);normalizeBook();render();}catch(error){alert(`Не удалось прочитать файл: ${error.message}`);}
+    document.getElementById("load-file").addEventListener("change", async (fileEvent) => {
+      const file = fileEvent.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      const match = text.match(/window\.MEMORY_BOOK\s*=\s*([\s\S]*);\s*$/);
+      try {
+        snapshot();
+        book = JSON.parse(match ? match[1] : text);
+        normalizeBook();
+        render();
+      } catch (error) {
+        alert(`Не удалось прочитать файл: ${error.message}`);
+      }
     });
     document.getElementById("export").addEventListener("click", () => {
-      const text="// Экспортировано из tools/studio.html\nwindow.MEMORY_BOOK = "+JSON.stringify(book,null,2)+";\n";
-      const blob=new Blob([text],{type:"text/javascript;charset=utf-8"});
-      const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download="memories.js";link.click();
-      setTimeout(()=>URL.revokeObjectURL(link.href),1000);
-      status.textContent="Файл memories.js экспортирован. Замени им content/memories.js.";
+      const text = `// Экспортировано из tools/studio.html\nwindow.MEMORY_BOOK = ${JSON.stringify(book, null, 2)};\n`;
+      const blob = new Blob([text], { type: "text/javascript;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = testMode ? "memories.test-edited.js" : "memories.js";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      status.textContent = "Экспорт готов. Примени его через tools/studio_workflow.py apply …";
     });
 
-    function formatDuration(seconds){
-      const total=Math.max(0,Math.round(Number(seconds)||0));const h=Math.floor(total/3600);const m=Math.floor((total%3600)/60);const s=total%60;
-      return h?`${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`:`${m}:${String(s).padStart(2,"0")}`;
+    function resolveMediaPath(value) {
+      const source = String(value || "");
+      return /^(?:https?:|data:|blob:|file:|\/|\.\.\/)/.test(source) ? source : `../${source.replace(/^\.\//, "")}`;
     }
-    function escapeHtml(value){return String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
-    function escapeAttr(value){return escapeHtml(value).replace(/`/g,"&#096;")}
+
+    function toDatetimeLocal(value) {
+      if (!value) return "";
+      const match = String(value).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+      return match ? `${match[1]}T${match[2]}` : "";
+    }
+
+    function formatTakenAt(value) {
+      if (!value) return "";
+      const date = new Date(value);
+      return Number.isNaN(date.getTime())
+        ? String(value)
+        : date.toLocaleString("ru-RU", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }).replace(",", " ·");
+    }
+
+    function isGeneratedDateCaption(caption, takenAt) {
+      if (!caption || !takenAt) return false;
+      return String(caption).toLowerCase().replace(/\s+/g, " ").replace(/,/g, " ·").trim()
+        === formatTakenAt(takenAt).toLowerCase().replace(/\s+/g, " ").trim();
+    }
+
+    function formatDuration(seconds) {
+      const total = Math.max(0, Math.round(Number(seconds) || 0));
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const secs = total % 60;
+      return hours
+        ? `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`
+        : `${minutes}:${String(secs).padStart(2, "0")}`;
+    }
+
+    function formatPreciseTime(seconds) {
+      const value = Math.max(0, Number(seconds) || 0);
+      const minutes = Math.floor(value / 60);
+      const secs = Math.floor(value % 60);
+      const hundredths = Math.floor((value % 1) * 100);
+      return `${minutes}:${String(secs).padStart(2, "0")}.${String(hundredths).padStart(2, "0")}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value).replace(/`/g, "&#096;");
+    }
   </script>
+  <script src="studio-round4.js"></script>
 </body>
 </html>

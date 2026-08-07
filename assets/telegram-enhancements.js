@@ -1,15 +1,112 @@
 (function () {
   "use strict";
 
-  document.addEventListener("DOMContentLoaded", function () {
-    const modes = window.TELEGRAM_MEDIA_MODES || {};
-    document.querySelectorAll("#telegram .scrap-collage__item img").forEach((image) => {
-      const source = image.getAttribute("src") || "";
-      const mode = modes[source] || (source.toLowerCase().endsWith(".png") ? "cutout" : "paper");
-      const card = image.closest(".scrap-collage__item");
-      if (!card) return;
-      card.classList.toggle("telegram-cutout", mode === "cutout");
-      card.classList.toggle("telegram-paper", mode !== "cutout");
+  if (typeof BroadcastChannel === "function") {
+    const previewChannel = new BroadcastChannel("memory-telegram-preview");
+    previewChannel.addEventListener("message", (event) => {
+      if (event.data?.type !== "telegram-saved") return;
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("telegram") !== "1") return;
+      window.location.reload();
     });
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const chapter = window.TELEGRAM_CHAPTER;
+    const root = document.getElementById("telegram");
+    if (!root || !chapter || !Array.isArray(chapter.blocks)) return;
+
+    const rendered = [...root.querySelectorAll(".chapter-content > .memory-block")];
+    chapter.blocks.forEach((block, index) => {
+      const element = rendered[index];
+      if (!element) return;
+
+      if (block.telegramKind === "note") {
+        const shape = Number(block.shape || 0) % 5;
+        const width = block.width === "wide" ? "wide" : "compact";
+        const align = ["left", "right"].includes(block.align) ? block.align : "auto";
+        element.classList.add(
+          "telegram-note",
+          `telegram-note--shape-${shape}`,
+          `telegram-note--${width}`,
+          `telegram-note--align-${align}`
+        );
+        element.style.setProperty("--telegram-offset-x", `${clamp(block.offsetX, -24, 24)}px`);
+        element.style.setProperty("--telegram-offset-y", `${clamp(block.offsetY, -16, 16)}px`);
+        return;
+      }
+
+      if (block.telegramKind !== "message") return;
+      const speaker = block.speaker === "sonya" ? "sonya" : "me";
+      element.classList.add("telegram-message", `telegram-message--${speaker}`);
+
+      const quote = element.querySelector(".memory-quote");
+      if (!quote) return;
+      quote.classList.add("telegram-message__quote", `telegram-message__quote--${speaker}`);
+
+      const screenshot = String(block.screenshot || "").trim();
+      if (!screenshot) return;
+
+      const layout = document.createElement("div");
+      layout.className = "telegram-message__layout";
+      quote.before(layout);
+      layout.appendChild(quote);
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `telegram-message__shot telegram-message__shot--${block.screenshotMode === "cutout" ? "cutout" : "paper"}`;
+      button.setAttribute("aria-label", `Открыть скриншот сообщения: ${block.author || ""}`.trim());
+
+      const image = document.createElement("img");
+      image.src = screenshot;
+      image.alt = block.screenshotAlt || "Скриншот сообщения из Telegram";
+      image.loading = "lazy";
+      image.decoding = "async";
+      button.appendChild(image);
+      button.addEventListener("click", () => openScreenshot(screenshot, image.alt));
+      layout.appendChild(button);
+    });
+
+    function openScreenshot(src, alt) {
+      const modal = ensureModal();
+      const image = modal.querySelector("img");
+      image.src = src;
+      image.alt = alt;
+      modal.hidden = false;
+      document.body.classList.add("telegram-shot-open");
+      modal.querySelector("button").focus();
+    }
+
+    function ensureModal() {
+      let modal = document.getElementById("telegram-shot-modal");
+      if (modal) return modal;
+      modal = document.createElement("div");
+      modal.id = "telegram-shot-modal";
+      modal.className = "telegram-shot-modal";
+      modal.hidden = true;
+      modal.innerHTML = `
+        <button type="button" aria-label="Закрыть скриншот">×</button>
+        <img alt="" />
+      `;
+      const close = () => {
+        modal.hidden = true;
+        modal.querySelector("img").removeAttribute("src");
+        document.body.classList.remove("telegram-shot-open");
+      };
+      modal.querySelector("button").addEventListener("click", close);
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) close();
+      });
+      document.addEventListener("keydown", (event) => {
+        if (!modal.hidden && event.key === "Escape") close();
+      });
+      document.body.appendChild(modal);
+      return modal;
+    }
   });
+
+  function clamp(value, min, max) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : 0;
+  }
 })();

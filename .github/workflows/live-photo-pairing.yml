@@ -1,0 +1,145 @@
+name: Strict Live Photo pairing
+
+on:
+  pull_request:
+    paths:
+      - "tools/live_photo_pairing.py"
+      - "tools/audit_live_photos.py"
+      - "tools/import_memories_strict.py"
+      - "tools/import_workflow_strict.py"
+      - "tools/import_with_locations.py"
+      - ".github/workflows/live-photo-pairing.yml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review-round-2-polish
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate strict pairing and audit
+        run: |
+          python -m py_compile \
+            tools/live_photo_pairing.py \
+            tools/audit_live_photos.py \
+            tools/import_memories_strict.py \
+            tools/import_workflow_strict.py \
+            tools/import_with_locations.py
+
+          PYTHONPATH=tools python - <<'PY'
+          import datetime as dt
+          import tempfile
+          from dataclasses import dataclass
+          from pathlib import Path
+
+          from audit_live_photos import Record, analyze
+          from live_photo_pairing import copy_family_stem, pair_live_photos_strict
+
+          @dataclass
+          class FakeMedia:
+              source: Path
+              kind: str
+              taken_at: dt.datetime
+              content_id: str | None = None
+              live_source: Path | None = None
+
+              @property
+              def is_image(self):
+                  return self.kind == "image"
+
+          now = dt.datetime(2026, 8, 6, 0, 0, 0)
+          assert copy_family_stem("IMG_8271") == "IMG_8271"
+          assert copy_family_stem("IMG_8271 2") == "IMG_8271"
+          assert copy_family_stem("IMG_8271_2") == "IMG_8271"
+          assert copy_family_stem("IMG_8271 (2)") == "IMG_8271"
+
+          with tempfile.TemporaryDirectory() as raw:
+              root = Path(raw)
+
+              # Three files with exactly the same stem are user-declared
+              # independent media. Even a matching ID must not consume MOV.
+              triple = [
+                  FakeMedia(root / "triple" / "IMG_7766.JPG", "image", now, "jpg-id"),
+                  FakeMedia(root / "triple" / "IMG_7766.HEIC", "image", now + dt.timedelta(seconds=1), "live-1"),
+                  FakeMedia(root / "triple" / "IMG_7766.MOV", "video", now + dt.timedelta(seconds=2), "live-1"),
+              ]
+              _, used = pair_live_photos_strict(triple)
+              assert not used
+              assert all(item.live_source is None for item in triple[:2])
+
+              # Real conflict case: a standalone IMG_8271 image exists, while
+              # the Live still was renamed but retains the MOV Apple ID.
+              renamed = [
+                  FakeMedia(root / "renamed" / "IMG_8271.HEIC", "image", now, "standalone"),
+                  FakeMedia(root / "renamed" / "IMG_8271 2.HEIC", "image", now + dt.timedelta(seconds=1), "live-8271"),
+                  FakeMedia(root / "renamed" / "IMG_8271.MOV", "video", now + dt.timedelta(seconds=2), "live-8271"),
+              ]
+              _, used = pair_live_photos_strict(renamed)
+              assert renamed[0].live_source is None
+              assert renamed[1].live_source == renamed[2].source
+              assert used == {renamed[2].source}
+
+              # A manually renamed still is still recovered by metadata.
+              manual_name = [
+                  FakeMedia(root / "manual" / "IMG_9999.HEIC", "image", now, "live-manual"),
+                  FakeMedia(root / "manual" / "IMG_8272.MOV", "video", now, "live-manual"),
+              ]
+              _, used = pair_live_photos_strict(manual_name)
+              assert manual_name[0].live_source == manual_name[1].source
+              assert used == {manual_name[1].source}
+
+              # If IDs are absent in a collision family, filename fallback is
+              # forbidden so the wrong IMG_8273 image cannot steal the MOV.
+              no_id_collision = [
+                  FakeMedia(root / "no-id" / "IMG_8273.HEIC", "image", now),
+                  FakeMedia(root / "no-id" / "IMG_8273 2.HEIC", "image", now + dt.timedelta(seconds=1)),
+                  FakeMedia(root / "no-id" / "IMG_8273.MOV", "video", now + dt.timedelta(seconds=2)),
+              ]
+              _, used = pair_live_photos_strict(no_id_collision)
+              assert not used
+
+              # A clean legacy one-image + one-video pair may use name/time.
+              legacy = [
+                  FakeMedia(root / "legacy" / "IMG_2000.HEIC", "image", now),
+                  FakeMedia(root / "legacy" / "IMG_2000.MOV", "video", now + dt.timedelta(seconds=8)),
+              ]
+              _, used = pair_live_photos_strict(legacy)
+              assert legacy[0].live_source == legacy[1].source
+              assert used == {legacy[1].source}
+
+              # Duplicate Apple IDs remain ambiguous.
+              duplicate_id = [
+                  FakeMedia(root / "duplicate" / "A.HEIC", "image", now, "same-id"),
+                  FakeMedia(root / "duplicate" / "B.HEIC", "image", now, "same-id"),
+                  FakeMedia(root / "duplicate" / "C.MOV", "video", now, "same-id"),
+              ]
+              _, used = pair_live_photos_strict(duplicate_id)
+              assert not used
+
+              # The report must expose the renamed recovery and the blocked
+              # same-stem triple without editing any path.
+              records = []
+              for item in [*triple, *renamed, *manual_name, *no_id_collision, *legacy, *duplicate_id]:
+                  records.append(Record(
+                      path=item.source,
+                      relative=item.source.relative_to(root).as_posix(),
+                      kind=item.kind,
+                      content_id=item.content_id or "",
+                      taken_at=item.taken_at,
+                      duration=3.0 if item.kind == "video" else None,
+                  ))
+              report = analyze(records)
+              assert report["summary"]["renamedExactPairs"] == 2
+              assert report["summary"]["ambiguousSameStemGroups"] >= 1
+              assert report["summary"]["unresolvedCollisionFamilies"] >= 1
+              assert any(pair["image"]["relative"].endswith("IMG_8271 2.HEIC") for pair in report["renamedExactPairs"])
+              assert any(group["stem"] == "IMG_7766" for group in report["ambiguousSameStemGroups"])
+
+          print("Strict Live Photo pairing and audit: OK")
+          PY

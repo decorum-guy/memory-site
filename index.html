@@ -6,10 +6,16 @@
   <meta name="theme-color" content="#d7c7a9" />
   <meta name="description" content="Личная книга воспоминаний" />
   <title>Наша книга воспоминаний</title>
+  <link rel="icon" href="assets/memory-book-icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="assets/styles.css" />
   <link rel="stylesheet" href="assets/media.css" />
   <link rel="stylesheet" href="assets/production.css" />
   <link rel="stylesheet" href="assets/shared-and-telegram.css" />
+  <link rel="stylesheet" href="assets/cursor-scrapbook-pencil-final-v19.css" />
+  <link rel="stylesheet" href="assets/round4-polish.css" />
+  <link rel="stylesheet" href="assets/location-overlay.css" />
+  <link rel="stylesheet" href="assets/reader-layout-fixes.css" />
+  <link rel="stylesheet" href="assets/reader-interaction-fixes.css" />
 </head>
 <body>
   <div class="ambient-grain" aria-hidden="true"></div>
@@ -25,7 +31,7 @@
       <div class="cover__seal" aria-hidden="true"><span>♥</span></div>
       <p class="cover__note" id="cover-note">Собрано вручную — из фотографий, видео и маленьких моментов.</p>
       <button class="open-book" id="open-book" type="button">
-        <span>Открыть книгу</span>
+        <span id="cover-open-label">Открыть книгу</span>
         <span class="open-book__arrow" aria-hidden="true">↘</span>
       </button>
     </div>
@@ -43,18 +49,25 @@
     <button class="lightbox__close" id="lightbox-close" type="button" aria-label="Закрыть">×</button>
     <button class="lightbox__nav lightbox__nav--prev" id="lightbox-prev" type="button" aria-label="Предыдущий файл">‹</button>
     <figure class="lightbox__figure">
-      <img class="lightbox__image" id="lightbox-image" alt="" />
-      <video class="lightbox__video" id="lightbox-video" playsinline preload="metadata" hidden></video>
-      <button class="lightbox__live" id="lightbox-live" type="button" hidden>▶ Оживить фото</button>
-      <div class="lightbox__censor" id="lightbox-censor" hidden>
-        <div class="lightbox__censor-card">
-          <span aria-hidden="true">!</span>
-          <h2>Содержание может быть шокирующим</h2>
-          <p>Этот момент скрыт намеренно. Открывай только если готова его увидеть.</p>
-          <button id="lightbox-censor-show" type="button">Показать</button>
+      <div class="lightbox__media-shell">
+        <div class="lightbox__location" id="lightbox-location" aria-live="polite" hidden></div>
+        <img class="lightbox__image" id="lightbox-image" alt="" />
+        <video class="lightbox__video" id="lightbox-video" playsinline preload="metadata" hidden></video>
+        <div class="lightbox__censor" id="lightbox-censor" hidden>
+          <div class="lightbox__censor-card">
+            <button class="lightbox__censor-close" id="lightbox-censor-close" type="button" aria-label="Закрыть предупреждение">×</button>
+            <span aria-hidden="true">!</span>
+            <h2>Содержание может быть шокирующим</h2>
+            <p>Этот момент скрыт намеренно. Открывай только если готова его увидеть.</p>
+            <button id="lightbox-censor-show" type="button">Показать</button>
+          </div>
         </div>
       </div>
       <figcaption class="lightbox__caption" id="lightbox-caption"></figcaption>
+      <div class="lightbox__live-controls">
+        <button class="lightbox__live" id="lightbox-live" type="button" hidden>▶ Оживить фото</button>
+        <button class="lightbox__sound" id="lightbox-live-sound" type="button" hidden aria-pressed="false" aria-label="Выключить звук" title="Выключить звук">🔊</button>
+      </div>
     </figure>
     <button class="lightbox__nav lightbox__nav--next" id="lightbox-next" type="button" aria-label="Следующий файл">›</button>
     <p class="lightbox__counter" id="lightbox-counter"></p>
@@ -70,5 +83,10 @@
   <script src="assets/preferences.js"></script>
   <script src="assets/app.js"></script>
   <script src="assets/telegram-enhancements.js"></script>
+  <script src="assets/round4-polish.js"></script>
+  <script src="assets/typography-settings.js"></script>
+  <script src="assets/location-overlay.js"></script>
+  <script src="assets/event-page-expansion.js"></script>
+  <script src="assets/reader-interaction-fixes.js"></script>
 </body>
 </html>

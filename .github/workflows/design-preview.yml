@@ -59,11 +59,14 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y ffmpeg
           fi
+          # VP9/WebM is used for this fixture because open-source Chromium in CI
+          # does not include the proprietary H.264 decoder. Production MP4 files
+          # remain supported by regular Chrome, Yandex Browser and Safari.
           ffmpeg -hide_banner -loglevel error -y \
             -loop 1 -i preview/demo-media/video-poster.jpg \
             -vf "scale=1280:-2,zoompan=z='min(zoom+0.0008,1.08)':d=120:s=1280x854:fps=30" \
-            -t 4 -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
-            preview/demo-media/demo-video.mp4
+            -t 4 -an -c:v libvpx-vp9 -b:v 0 -crf 34 -pix_fmt yuv420p \
+            preview/demo-media/demo-video.webm
           ffmpeg -hide_banner -loglevel error -y \
             -loop 1 -i preview/demo-media/photo-11.jpg \
             -vf "scale=1080:-2,zoompan=z='min(zoom+0.0014,1.10)':d=90:s=1080x1440:fps=30" \
@@ -100,6 +103,8 @@ jobs:
       - name: Capture desktop and mobile screenshots
         id: capture
         continue-on-error: true
+        env:
+          PW_TEST_SCREENSHOT_NO_FONTS_READY: "1"
         run: |
           set -o pipefail
           node preview/capture.mjs 2>&1 | tee preview/capture.log

@@ -441,7 +441,7 @@ def media_to_dict(media: Media) -> dict[str, Any]:
     common: dict[str, Any] = {
         "id": media.item_id,
         "src": media.output_src,
-        "caption": media.caption,
+        "caption": "",
         "takenAt": media.taken_at.isoformat(timespec="seconds"),
         "censored": False,
     }
@@ -452,26 +452,39 @@ def media_to_dict(media: Media) -> dict[str, Any]:
     return common
 
 
+def russian_plural(number: int, one: str, few: str, many: str) -> str:
+    mod10 = number % 10
+    mod100 = number % 100
+    if mod10 == 1 and mod100 != 11:
+        return one
+    if 2 <= mod10 <= 4 and not 12 <= mod100 <= 14:
+        return few
+    return many
+
+
 def build_book(events: list[Event]) -> dict[str, Any]:
     by_year: dict[int, list[Event]] = defaultdict(list)
     for event in events:
         by_year[event.start.year].append(event)
+    years = sorted(by_year)
     chapters = []
-    for chapter_index, year in enumerate(sorted(by_year)):
+    for chapter_index, year in enumerate(years):
         blocks = []
         for event_index, event in enumerate(by_year[year]):
             blocks.append({
                 "type": "event", "id": f"event-{year}-{event_index + 1:03d}", "title": format_event_title(event),
                 "caption": "Добавь сюда одну короткую деталь об этом дне.", "date": event.start.isoformat(timespec="minutes"),
-                "layout": "stack" if len(event.items) > 7 else "collage", "items": [media_to_dict(item) for item in event.items],
+                "layout": "stack" if len(event.items) > 8 else "collage", "items": [media_to_dict(item) for item in event.items],
             })
+        count = len(by_year[year])
         chapters.append({
-            "id": f"year-{year}", "number": f"{chapter_index + 1:02d}", "kicker": "Глава по времени", "title": str(year),
-            "subtitle": f"{len(by_year[year])} событий, собранных автоматически по датам, месту и визуальной близости.",
+            "id": f"year-{year}", "number": str(year), "kicker": "Глава по времени", "title": str(year),
+            "subtitle": f"{count} {russian_plural(count, 'событие', 'события', 'событий')}, собранных автоматически по датам, месту и визуальной близости.",
             "layout": LAYOUTS[chapter_index % len(LAYOUTS)], "theme": THEMES[chapter_index % len(THEMES)], "blocks": blocks,
         })
+    archive_label = "АРХИВ" if not years else f"АРХИВ · {years[0]}" + (f"—{years[-1]}" if len(years) > 1 else "")
     return {
-        "meta": {"eyebrow": "Личная книга воспоминаний", "title": "Наши три года", "subtitle": "Не идеальные. Настоящие.", "note": "Сначала собраны автоматически. Потом — поправлены вручную.", "footer": "Спасибо за всё, что было между первой и последней страницей.", "accent": "#9c3f43"},
+        "meta": {"eyebrow": "Личная книга воспоминаний", "title": "Наши три года", "subtitle": "Не идеальные. Настоящие.", "note": "Сначала собраны автоматически. Потом — поправлены вручную.", "openLabel": "Открыть книгу", "archiveLabel": archive_label, "footer": "Спасибо за всё, что было между первой и последней страницей.", "accent": "#9c3f43"},
         "chapters": chapters,
     }
 

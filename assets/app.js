@@ -22,6 +22,7 @@
   const lightboxNext = byId("lightbox-next");
   const lightboxCensor = byId("lightbox-censor");
   const lightboxCensorShow = byId("lightbox-censor-show");
+  const lightboxCensorClose = byId("lightbox-censor-close");
 
   let activeGallery = [];
   let activeIndex = 0;
@@ -34,6 +35,11 @@
   renderRail();
   bindNavigation();
   observeChapters();
+  restoreReaderChrome();
+  document.addEventListener("memory:censorship-change", (event) => {
+    if (!event.detail?.off) revealedCensored.clear();
+    if (!lightbox.hidden) updateLightbox();
+  });
 
   function byId(id) { return document.getElementById(id); }
 
@@ -109,8 +115,11 @@
 
   function renderEventBlock(wrapper, block, uniqueId) {
     const items = (block.items || []).map(normalizeMedia);
-    const previewItems = items.filter((item) => item.kind !== "audio").slice(0, block.layout === "stack" ? 5 : 7);
-    wrapper.classList.add(`event-layout-${safeClass(block.layout || "collage")}`);
+    const layout = block.layout === "stack" && items.length > 8 ? "stack" : "collage";
+    const previewItems = items.filter((item) => item.kind !== "audio").slice(0, layout === "stack" ? 5 : 8);
+    const rowCount = layout === "stack" ? 0 : (previewItems.length <= 4 ? 1 : 2);
+    wrapper.classList.add(`event-layout-${safeClass(layout)}`, `event-count-${Math.min(items.length, 8)}`);
+    if (rowCount) wrapper.classList.add(`event-rows-${rowCount}`);
     wrapper.innerHTML = `
       <header class="event-heading">
         <div>
@@ -125,16 +134,24 @@
     previewItems.forEach((item, index) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = `event-preview__item event-preview__item--${(index % 7) + 1}`;
-      button.style.setProperty("--event-rotate", `${[-5, 3, -2, 6, -4, 2, -1][index % 7]}deg`);
+      button.className = `event-preview__item event-preview__item--${(index % 8) + 1}`;
+      button.style.setProperty("--event-rotate", `${[-5, 3, -2, 6, -4, 2, -1, 4][index % 8]}deg`);
       button.setAttribute("aria-label", item.censored ? `Открыть скрытый элемент ${index + 1}` : `Открыть элемент ${index + 1}`);
       button.appendChild(createMediaPreview(item));
+      const note = mediaNote(item);
+      if (note) {
+        const label = document.createElement("span");
+        label.className = "event-preview__caption";
+        label.textContent = note;
+        label.title = note;
+        button.appendChild(label);
+      }
       button.addEventListener("click", () => openGallery(items, items.indexOf(item)));
       preview.appendChild(button);
     });
     const count = document.createElement("span");
     count.className = "event-preview__count";
-    count.textContent = `${items.length} файлов`;
+    count.textContent = `${items.length} ${plural(items.length, "файл", "файла", "файлов")}`;
     preview.appendChild(count);
     wrapper.querySelector(".event-open").addEventListener("click", () => openGallery(items, 0));
     return wrapper;
@@ -275,21 +292,41 @@
 
   function createMediaPreview(item) {
     const frame = document.createElement("span");
+    const key = mediaKey(item);
+    const locallyRevealed = revealedCensored.has(key);
+    const isCensored = item.censored && !window.MEMORY_CENSORSHIP_OFF && !locallyRevealed;
+    const crop = normalizeCrop(item.crop);
     frame.className = `image-frame media-kind-${safeClass(item.kind)}`;
-    frame.classList.toggle("is-censored", item.censored);
+    frame.dataset.mediaKey = key;
+    frame.dataset.censored = item.censored ? "1" : "0";
+    frame.classList.toggle("is-censored", isCensored);
+    frame.classList.toggle("is-revealed", locallyRevealed);
 
-    const image = document.createElement("img");
-    image.src = item.thumb || item.poster || item.src || "";
-    image.alt = item.censored ? "Скрытое воспоминание" : (item.alt || (item.kind === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний"));
-    image.loading = "lazy";
-    image.decoding = "async";
+    const useSelectedVideoFrame = item.kind === "video" && item.posterTime !== null;
+    const media = document.createElement(useSelectedVideoFrame ? "video" : "img");
+    media.style.objectPosition = `${crop.x}% ${crop.y}%`;
+
+    if (useSelectedVideoFrame) {
+      media.muted = true;
+      media.playsInline = true;
+      media.preload = "auto";
+      media.poster = item.poster || "";
+      media.src = item.src || "";
+      media.dataset.posterTime = String(item.posterTime);
+    } else {
+      media.src = item.thumb || item.poster || item.src || "";
+      media.alt = isCensored ? "Скрытое воспоминание" : (item.alt || (item.kind === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний"));
+      media.loading = "lazy";
+      media.decoding = "async";
+    }
 
     const placeholder = document.createElement("span");
     placeholder.className = "image-placeholder";
     placeholder.innerHTML = `<span>файл не найден</span><small>${escapeHtml(item.src || "")}</small>`;
-    image.addEventListener("error", () => frame.classList.add("is-missing"));
-    image.addEventListener("load", () => frame.classList.remove("is-missing"));
-    frame.append(image, placeholder);
+    media.addEventListener("error", () => frame.classList.add("is-missing"));
+    media.addEventListener(useSelectedVideoFrame ? "loadeddata" : "load", () => frame.classList.remove("is-missing"));
+    frame.append(media, placeholder);
+    if (useSelectedVideoFrame) seekPreviewVideo(media, item.posterTime);
 
     if (item.kind === "live") {
       const badge = document.createElement("span");
@@ -303,13 +340,95 @@
       frame.appendChild(badge);
     }
 
-    if (item.censored) {
+    if (isCensored) {
       const cover = document.createElement("span");
       cover.className = "censor-preview";
       cover.innerHTML = "<strong>Содержание скрыто</strong><small>Нажми, чтобы открыть предупреждение</small>";
       frame.appendChild(cover);
     }
     return frame;
+  }
+
+  function seekPreviewVideo(video, time) {
+    const requested = Math.max(0, Number(time) || 0);
+    let settled = false;
+    let attempts = 0;
+    let retryTimer = 0;
+
+    const safeTime = () => {
+      const duration = Number.isFinite(video.duration) ? video.duration : Infinity;
+      return duration === Infinity ? requested : Math.min(requested, Math.max(0, duration - .01));
+    };
+
+    const schedule = (delay = 120) => {
+      if (settled || attempts >= 18) return;
+      window.clearTimeout(retryTimer);
+      retryTimer = window.setTimeout(renderSelectedFrame, delay);
+    };
+
+    const finishWhenDecoded = () => {
+      if (settled) return;
+      const safe = safeTime();
+      if (video.readyState < 2 || Math.abs(video.currentTime - safe) > .08) {
+        schedule(100);
+        return;
+      }
+      const finish = () => {
+        if (settled || Math.abs(video.currentTime - safe) > .12) {
+          schedule(80);
+          return;
+        }
+        settled = true;
+        window.clearTimeout(retryTimer);
+        video.pause();
+        video.removeAttribute("poster");
+        video.dataset.frameReady = "1";
+      };
+      if (typeof video.requestVideoFrameCallback === "function") {
+        video.requestVideoFrameCallback(finish);
+      } else {
+        requestAnimationFrame(finish);
+      }
+    };
+
+    function renderSelectedFrame() {
+      if (settled) return;
+      attempts += 1;
+      if (!video.isConnected || video.readyState < 1) {
+        if (video.readyState === 0) video.load();
+        schedule(Math.min(500, 60 * attempts));
+        return;
+      }
+      const safe = safeTime();
+      try {
+        if (typeof video.fastSeek === "function") video.fastSeek(safe);
+        else video.currentTime = safe;
+      } catch (_) {
+        schedule(Math.min(500, 70 * attempts));
+        return;
+      }
+      const playback = video.play();
+      if (playback && typeof playback.then === "function") {
+        playback.then(() => {
+          if (Math.abs(video.currentTime - safe) > .08) {
+            try { video.currentTime = safe; }
+            catch (_) { /* next scheduled attempt will retry */ }
+          }
+          finishWhenDecoded();
+        }).catch(() => finishWhenDecoded());
+      } else {
+        finishWhenDecoded();
+      }
+      schedule(Math.min(600, 100 + attempts * 45));
+    }
+
+    ["loadedmetadata", "loadeddata", "canplay", "durationchange", "progress", "seeked"].forEach((name) => {
+      video.addEventListener(name, () => {
+        if (name === "seeked") finishWhenDecoded();
+        else renderSelectedFrame();
+      });
+    });
+    requestAnimationFrame(renderSelectedFrame);
   }
 
   function renderRail() {
@@ -345,6 +464,7 @@
     lightboxNext.addEventListener("click", () => moveGallery(1));
     lightboxLive.addEventListener("click", toggleLive);
     lightboxCensorShow.addEventListener("click", revealCurrentCensored);
+    lightboxCensorClose.addEventListener("click", closeGallery);
     lightbox.addEventListener("click", (event) => { if (event.target === lightbox) closeGallery(); });
     document.addEventListener("keydown", (event) => {
       if (lightbox.hidden) return;
@@ -379,7 +499,6 @@
     activeGallery = items;
     activeIndex = Math.max(0, Math.min(index, items.length - 1));
     previousFocus = document.activeElement;
-    revealedCensored.clear();
     updateLightbox();
     lightbox.hidden = false;
     document.body.classList.add("lightbox-open");
@@ -406,7 +525,7 @@
   function updateLightbox() {
     stopMedia();
     const item = activeGallery[activeIndex];
-    lightboxCaption.textContent = item.caption || item.alt || "";
+    lightboxCaption.innerHTML = renderMediaCaption(item);
     lightboxCounter.textContent = `${activeIndex + 1} / ${activeGallery.length}`;
     const multi = activeGallery.length > 1;
     lightboxPrev.hidden = !multi;
@@ -414,7 +533,7 @@
     lightbox.classList.toggle("is-video", item.kind === "video");
     lightbox.classList.toggle("is-live", item.kind === "live");
 
-    if (item.censored && !revealedCensored.has(mediaKey(item))) {
+    if (!window.MEMORY_CENSORSHIP_OFF && item.censored && !revealedCensored.has(mediaKey(item))) {
       lockCensoredItem();
       return;
     }
@@ -433,6 +552,7 @@
     const item = activeGallery[activeIndex];
     if (!item) return;
     revealedCensored.add(mediaKey(item));
+    revealPreviewCopies(item);
     lightboxCensor.hidden = true;
     renderLightboxMedia(item);
     lightboxClose.focus();
@@ -495,15 +615,20 @@
 
   function isCurrentCensoredLocked() {
     const item = activeGallery[activeIndex];
-    return Boolean(item && item.censored && !revealedCensored.has(mediaKey(item)));
+    return Boolean(item && !window.MEMORY_CENSORSHIP_OFF && item.censored && !revealedCensored.has(mediaKey(item)));
   }
 
-  function mediaKey(item) {
-    return item.id || item.src || `${item.kind}-${activeIndex}`;
+  function mediaKey(item, fallbackIndex = activeIndex) {
+    return String(item.id || item.src || `${item.kind}-${fallbackIndex}`);
   }
 
   function normalizeMedia(item) {
     const inferred = item.kind || (item.liveVideo ? "live" : item.poster ? "video" : "photo");
+    const takenAt = item.takenAt || "";
+    const rawCaption = item.caption || item.note || "";
+    const posterTimeValue = item.posterTime === null || item.posterTime === undefined || item.posterTime === ""
+      ? null
+      : Number(item.posterTime);
     return {
       id: item.id || "",
       kind: inferred,
@@ -512,11 +637,77 @@
       poster: item.poster || "",
       liveVideo: item.liveVideo || "",
       alt: item.alt || (inferred === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний"),
-      caption: item.caption || "",
-      takenAt: item.takenAt || "",
+      caption: isGeneratedDateCaption(rawCaption, takenAt) ? "" : rawCaption,
+      takenAt,
       duration: numberOr(item.duration, 0),
-      censored: item.censored === true
+      censored: item.censored === true,
+      crop: normalizeCrop(item.crop),
+      posterTime: Number.isFinite(posterTimeValue) && posterTimeValue >= 0 ? posterTimeValue : null
     };
+  }
+
+  function normalizeCrop(value) {
+    const x = Number(value?.x);
+    const y = Number(value?.y);
+    return {
+      x: Number.isFinite(x) ? Math.min(100, Math.max(0, x)) : 50,
+      y: Number.isFinite(y) ? Math.min(100, Math.max(0, y)) : 50
+    };
+  }
+
+  function restoreReaderChrome() {
+    const params = new URLSearchParams(window.location.search);
+    const forcedOpen = params.get("opened") === "1" || window.location.hash === "#memory-book";
+    const update = () => {
+      const cover = byId("cover");
+      const threshold = cover ? Math.min(160, cover.offsetHeight * .12) : 80;
+      if (forcedOpen || window.scrollY > threshold || window.location.hash) {
+        document.body.classList.add("book-opened");
+      }
+    };
+    update();
+    [80, 250, 700, 1500].forEach((delay) => window.setTimeout(update, delay));
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("pageshow", () => requestAnimationFrame(update));
+    window.addEventListener("hashchange", update);
+  }
+
+  function revealPreviewCopies(item) {
+    const key = mediaKey(item);
+    document.querySelectorAll(".image-frame[data-media-key]").forEach((frame) => {
+      if (frame.dataset.mediaKey !== key) return;
+      frame.classList.remove("is-censored");
+      frame.classList.add("is-revealed");
+      frame.querySelector(".censor-preview")?.remove();
+      const image = frame.querySelector("img");
+      if (image) image.alt = item.alt || (item.kind === "video" ? "Видео из воспоминаний" : "Фотография из воспоминаний");
+    });
+  }
+
+  function renderMediaCaption(item) {
+    const date = formatTakenAt(item.takenAt);
+    const note = mediaNote(item);
+    return `${date ? `<span class="lightbox__datetime">${escapeHtml(date)}</span>` : ""}${note ? `<span class="lightbox__note">${escapeHtml(note)}</span>` : ""}`;
+  }
+
+  function mediaNote(item) {
+    const caption = String(item.caption || "").trim();
+    return isGeneratedDateCaption(caption, item.takenAt) ? "" : caption;
+  }
+
+  function formatTakenAt(value) {
+    if (!value) return "";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleString("ru-RU", {
+      day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit"
+    }).replace(",", " ·");
+  }
+
+  function isGeneratedDateCaption(caption, takenAt) {
+    if (!caption || !takenAt) return false;
+    const normalized = String(caption).toLowerCase().replace(/\s+/g, " ").replace(/,/g, " ·").trim();
+    return normalized === formatTakenAt(takenAt).toLowerCase().replace(/\s+/g, " ").trim();
   }
 
   function formatDate(value) {

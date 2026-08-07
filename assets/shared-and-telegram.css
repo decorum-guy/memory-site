@@ -160,3 +160,102 @@
   .shared-album-card__qr { width: min(14rem, 78vw); justify-self: center; }
   .shared-album-card h2 { max-width: 17ch; }
 }
+
+/* Round 3: a small authored Telegram chapter — notes and message quotations. */
+#telegram .telegram-note,
+#telegram .telegram-message {
+  grid-column: 1 / -1;
+  width: min(100%, 58rem);
+  justify-self: center;
+}
+#telegram .telegram-note .paper-note {
+  position: relative;
+  width: min(100%, 48rem);
+  margin-inline: auto;
+  padding: clamp(1.7rem, 4vw, 3rem);
+  color: #3d342a;
+  background: #f3e2b9;
+  box-shadow: .8rem 1rem 1.5rem rgba(52,36,20,.16);
+  font: 400 clamp(1.05rem, 2vw, 1.3rem)/1.75 var(--hand);
+}
+#telegram .telegram-note--shape-0 .paper-note { clip-path: polygon(0 5%,5% 2%,11% 6%,18% 1%,25% 5%,33% 2%,41% 6%,50% 1%,59% 5%,68% 2%,77% 6%,87% 1%,100% 5%,98% 93%,91% 97%,83% 92%,74% 98%,65% 93%,56% 98%,47% 92%,38% 97%,29% 93%,20% 98%,11% 92%,2% 96%); }
+#telegram .telegram-note--shape-1 .paper-note { clip-path: polygon(0 3%,8% 6%,16% 2%,24% 7%,33% 1%,43% 5%,53% 2%,63% 7%,73% 2%,84% 6%,93% 1%,100% 4%,97% 96%,89% 92%,80% 98%,70% 93%,60% 97%,50% 92%,40% 98%,30% 93%,19% 97%,9% 92%,1% 95%); }
+#telegram .telegram-note--shape-2 .paper-note { clip-path: polygon(0 6%,7% 1%,15% 5%,23% 2%,31% 7%,40% 1%,49% 6%,58% 2%,67% 5%,76% 1%,86% 7%,94% 2%,100% 6%,98% 94%,90% 98%,81% 93%,72% 97%,63% 92%,54% 98%,45% 93%,36% 97%,27% 92%,18% 98%,9% 93%,1% 97%); }
+#telegram .telegram-note--shape-3 .paper-note { clip-path: polygon(0 4%,6% 7%,14% 1%,22% 5%,30% 2%,38% 6%,47% 1%,56% 5%,65% 2%,74% 7%,83% 1%,92% 5%,100% 2%,97% 95%,88% 98%,79% 92%,70% 97%,61% 93%,52% 98%,43% 92%,34% 97%,25% 93%,16% 98%,7% 92%,1% 96%); }
+#telegram .telegram-note--shape-4 .paper-note { clip-path: polygon(0 2%,9% 6%,18% 1%,27% 5%,36% 2%,45% 7%,54% 1%,63% 5%,72% 2%,81% 6%,90% 1%,100% 5%,98% 97%,89% 92%,80% 98%,71% 93%,62% 97%,53% 92%,44% 98%,35% 93%,26% 97%,17% 92%,8% 98%,1% 94%); }
+
+#telegram .telegram-message__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 19rem);
+  gap: clamp(1rem, 4vw, 2.5rem);
+  align-items: center;
+}
+#telegram .telegram-message__quote {
+  min-height: 12rem;
+  padding: clamp(1.5rem, 4vw, 2.6rem) clamp(1.5rem, 4vw, 3rem) clamp(1.5rem, 4vw, 2.4rem) clamp(4rem, 7vw, 5.4rem);
+  border: 0;
+  color: #fff9ec;
+  box-shadow: .7rem 1rem 1.5rem rgba(52,36,20,.18);
+}
+#telegram .telegram-message__quote--sonya { background: var(--accent); }
+#telegram .telegram-message__quote--me { background: #4b7692; }
+#telegram .telegram-message__quote > span { color: rgba(255,255,255,.75); }
+#telegram .telegram-message__quote cite { color: rgba(255,255,255,.72); }
+#telegram .telegram-message__shot {
+  position: relative;
+  width: 100%;
+  max-height: 28rem;
+  border: 0;
+  padding: .55rem .55rem 1.35rem;
+  overflow: hidden;
+  background: #fffaf0;
+  box-shadow: .7rem 1rem 1.5rem rgba(51,35,21,.22);
+  transform: rotate(2deg);
+}
+#telegram .telegram-message__shot img {
+  display: block;
+  width: 100%;
+  max-height: 25rem;
+  object-fit: contain;
+}
+#telegram .telegram-message__shot--cutout {
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
+}
+#telegram .telegram-message__shot--cutout img {
+  filter: drop-shadow(.55rem .85rem .7rem rgba(43,31,20,.25));
+}
+.telegram-shot-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 420;
+  display: grid;
+  place-items: center;
+  padding: 3rem 1rem;
+  background: rgba(20,17,15,.94);
+  backdrop-filter: blur(9px);
+}
+.telegram-shot-modal[hidden] { display: none; }
+.telegram-shot-modal img {
+  max-width: min(92vw, 1000px);
+  max-height: 84vh;
+  object-fit: contain;
+  box-shadow: 0 1.5rem 4rem rgba(0,0,0,.5);
+}
+.telegram-shot-modal button {
+  position: fixed;
+  top: 1rem;
+  right: 1.4rem;
+  border: 0;
+  color: #f8ead4;
+  background: transparent;
+  font: 300 2.7rem/1 var(--sans);
+}
+.telegram-shot-open { overflow: hidden; }
+
+@media (max-width: 760px) {
+  #telegram .telegram-message__layout { grid-template-columns: 1fr; }
+  #telegram .telegram-message__shot { width: min(18rem, 86vw); justify-self: center; }
+}

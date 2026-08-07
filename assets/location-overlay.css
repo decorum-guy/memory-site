@@ -1,0 +1,31 @@
+.lightbox__figure {
+  position: relative;
+}
+
+.lightbox__location {
+  position: absolute;
+  z-index: 7;
+  top: clamp(.75rem, 2vw, 1.2rem);
+  left: clamp(.75rem, 2vw, 1.2rem);
+  max-width: min(72%, 34rem);
+  padding: .52rem .72rem;
+  border: 1px solid rgba(255, 255, 255, .42);
+  border-radius: 999px;
+  color: #fffaf0;
+  background: rgba(29, 25, 22, .68);
+  box-shadow: 0 .45rem 1.35rem rgba(0, 0, 0, .24);
+  backdrop-filter: blur(10px);
+  font: 750 clamp(.68rem, 1.4vw, .82rem)/1.2 var(--sans);
+  letter-spacing: .015em;
+  text-wrap: balance;
+  pointer-events: none;
+}
+
+@media (max-width: 600px) {
+  .lightbox__location {
+    top: .65rem;
+    left: .65rem;
+    max-width: calc(100% - 4rem);
+    padding: .45rem .62rem;
+  }
+}

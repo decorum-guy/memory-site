@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="64"
+     height="64"
+     viewBox="0 0 64 64"
+     fill="none">
+<title>Scrapbook pencil cursor — basic, aligned hotspot</title>
+<g transform="matrix(1.26 0 0 1.26 9.059160 10.077654)">
+<path d="M1.61709 30.8097L4.27767 20.3934L11.8172 27.394L1.61709 30.8097Z" fill="#EBC990" stroke="#57391F" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M2.334 30.0971L3.43603 27.5616L4.82444 28.745L2.334 30.0971Z" fill="#302B27" stroke="#302B27" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M4.41016 20.2L18.1102 6.43001L25.3602 13.33L11.9502 27.2L4.41016 20.2Z" fill="#E7832D" stroke="#57391F" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M6.7002 21.2L19.1302 8.75L20.7302 10.35L8.35019 22.85L6.7002 21.2Z" fill="#F8B14E"/>
+<path opacity="0.48" d="M9.7002 24.45L23.1102 11.03L25.3602 13.33L11.9502 27.2L9.7002 24.45Z" fill="#B95D20"/>
+<path d="M16.4102 8.14L19.1102 5.44L26.3102 12.34L23.5602 15.14L16.4102 8.14Z" fill="#C9B89D" stroke="#57391F" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M26.84 11.8L29.79 8.79C30.17 8.40334 30.1667 8.01667 29.78 7.63L23.83 1.8C23.4367 1.41334 23.05 1.41667 22.67 1.81L19.72 4.82C19.34 5.20667 19.3434 5.59334 19.73 5.98L25.68 11.81C26.0734 12.19 26.46 12.1867 26.84 11.8Z" fill="#D9745E" stroke="#57391F" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+<g opacity="0.5">
+<path d="M7.9502 22.25L18.5202 11.47" stroke="#7B4A24" stroke-width="0.34" stroke-linecap="round"/>
+<path d="M10 23L20 13" stroke="#7B4A24" stroke-width="0.34" stroke-linecap="round"/>
+</g>
+</g>
+
+</svg>

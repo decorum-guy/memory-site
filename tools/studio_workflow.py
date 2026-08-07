@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Открытие Memory Studio и безопасное применение экспортированного memories.js."""
+"""Открытие Memory Studio и безопасное применение экспортированного memories.js.
+
+Экспорт сохраняет дополнительные метаданные Studio, включая crop и posterTime.
+"""
 from __future__ import annotations
 
 import argparse
@@ -26,6 +29,15 @@ def open_path(path: Path) -> None:
         subprocess.run(["open", str(path)], check=False)
     else:
         webbrowser.open(path.resolve().as_uri())
+
+
+def open_book(root: Path, chapter_id: str = "memory-book") -> None:
+    safe_id = re.sub(r"[^A-Za-z0-9_-]", "-", chapter_id or "memory-book")
+    url = (root / "index.html").resolve().as_uri() + f"?opened=1#{safe_id}"
+    if sys.platform == "darwin":
+        subprocess.run(["open", url], check=False)
+    else:
+        webbrowser.open(url)
 
 
 def extract_book(path: Path) -> dict[str, Any]:
@@ -140,7 +152,9 @@ def command_apply(args: argparse.Namespace) -> int:
     print(f"Правки применены к {args.scope}: {target}")
     print(f"Резервная копия: {backup}")
     if args.open:
-        open_path(root / "index.html")
+        chapters = book.get("chapters") or []
+        first_chapter_id = str((chapters[0] if chapters else {}).get("id") or "memory-book")
+        open_book(root, first_chapter_id)
     else:
         print(f"Открыть книгу: open \"{root / 'index.html'}\"")
     return 0

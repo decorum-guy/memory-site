@@ -1,0 +1,166 @@
+name: Incremental Memory Studio media import
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/incremental_media_import.py"
+      - "tools/memory_server.py"
+      - "tools/studio-media-import.js"
+      - "tools/studio-media-import.css"
+      - "tools/studio-round4.js"
+      - "tools/telegram_server.py"
+      - "tools/import_memories.py"
+      - "tools/live_photo_pairing.py"
+      - "assets/event-page-expansion.js"
+      - "preview/verify_incremental_media_import.mjs"
+      - ".github/workflows/incremental-media-import.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install media dependencies
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg libimage-exiftool-perl
+
+      - name: Prepare edited production book and upload fixtures
+        run: |
+          rm -rf preview/incremental-fixture .memory-imports .memory-import-source media/generated
+          mkdir -p preview/incremental-fixture content
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+          import json
+          import os
+          import subprocess
+          import datetime as dt
+
+          root = Path("preview/incremental-fixture")
+          root.mkdir(parents=True, exist_ok=True)
+
+          def photo(path: Path, label: str, color: tuple[int, int, int], stamp: dt.datetime):
+              image = Image.new("RGB", (960, 720), color)
+              draw = ImageDraw.Draw(image)
+              draw.rectangle((40, 40, 920, 680), outline="white", width=8)
+              draw.text((80, 320), label, fill="white")
+              image.save(path, "JPEG", quality=88)
+              timestamp = stamp.timestamp()
+              os.utime(path, (timestamp, timestamp))
+              subprocess.run([
+                  "exiftool", "-overwrite_original",
+                  f"-DateTimeOriginal={stamp:%Y:%m:%d %H:%M:%S}",
+                  f"-CreateDate={stamp:%Y:%m:%d %H:%M:%S}",
+                  str(path),
+              ], check=True, stdout=subprocess.DEVNULL)
+
+          photo(root / "existing.jpg", "EXISTING", (95, 70, 55), dt.datetime(2025, 11, 17, 12, 0))
+          for index in range(18):
+              photo(
+                  root / f"batch-{index + 1:02d}.jpg",
+                  f"BATCH {index + 1}",
+                  (80 + index * 5, 75 + index * 3, 105 + index * 2),
+                  dt.datetime(2026, 2, 14, 10, index),
+              )
+          photo(root / "LIVE_0001.JPG", "LIVE", (115, 65, 85), dt.datetime(2026, 2, 15, 12, 0))
+          photo(root / "target-photo.jpg", "TARGET", (60, 100, 85), dt.datetime(2025, 11, 17, 12, 5))
+
+          subprocess.run([
+              "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+              "-f", "lavfi", "-i", "testsrc=size=960x720:rate=24",
+              "-t", "1.2", "-metadata", "creation_time=2026-02-14T10:20:00Z",
+              "-pix_fmt", "yuv420p", str(root / "standalone.mp4"),
+          ], check=True)
+          subprocess.run([
+              "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+              "-f", "lavfi", "-i", "testsrc2=size=960x720:rate=24",
+              "-t", "1.0", "-metadata", "creation_time=2026-02-15T12:00:00Z",
+              "-pix_fmt", "yuv420p", str(root / "LIVE_0001.MOV"),
+          ], check=True)
+          for name, stamp in [
+              ("standalone.mp4", dt.datetime(2026, 2, 14, 10, 20)),
+              ("LIVE_0001.MOV", dt.datetime(2026, 2, 15, 12, 0)),
+          ]:
+              timestamp = stamp.timestamp()
+              os.utime(root / name, (timestamp, timestamp))
+
+          book = {
+              "meta": {
+                  "title": "Incremental import fixture",
+                  "accent": "#9c3f43",
+                  "manualMarker": "KEEP-ME",
+              },
+              "chapters": [{
+                  "id": "year-2025",
+                  "number": "2025",
+                  "kicker": "Глава по времени",
+                  "title": "2025",
+                  "subtitle": "Ручная глава",
+                  "layout": "wide",
+                  "theme": "rose",
+                  "blocks": [{
+                      "type": "event",
+                      "id": "existing-event",
+                      "title": "17 ноября 2025",
+                      "caption": "Ручная подпись, которую нельзя потерять",
+                      "date": "2025-11-17T12:00",
+                      "layout": "collage",
+                      "items": [{
+                          "id": "existing-item",
+                          "kind": "photo",
+                          "src": "preview/incremental-fixture/existing.jpg",
+                          "thumb": "preview/incremental-fixture/existing.jpg",
+                          "caption": "Ручная подпись фото",
+                          "takenAt": "2025-11-17T12:00:00",
+                          "censored": False,
+                      }],
+                  }],
+              }],
+          }
+          Path("content/memories.js").write_text(
+              "window.MEMORY_BOOK = " + json.dumps(book, ensure_ascii=False, indent=2) + ";\n",
+              encoding="utf-8",
+          )
+          PY
+          python -m py_compile tools/incremental_media_import.py tools/memory_server.py tools/telegram_server.py
+          node --check tools/studio-media-import.js
+          node --check tools/studio-round4.js
+          node --check preview/verify_incremental_media_import.mjs
+
+      - name: Install Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund playwright@1.54.2
+          npx playwright install --with-deps chromium
+
+      - name: Run incremental importer end-to-end
+        run: |
+          python3 tools/memory_server.py >/tmp/memory-server.log 2>&1 &
+          for attempt in {1..40}; do
+            curl --fail --silent http://127.0.0.1:8765/tools/studio.html >/dev/null && break
+            sleep 1
+          done
+          PREVIEW_URL=http://127.0.0.1:8765 node preview/verify_incremental_media_import.mjs
+
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/memory-server.log || true

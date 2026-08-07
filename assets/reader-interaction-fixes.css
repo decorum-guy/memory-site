@@ -1,0 +1,37 @@
+/* Interaction corrections from production review. Loaded after all legacy
+   reader styles. Card order is fixed in the DOM, while the existing scrapbook
+   rotations, offsets and layer depth remain untouched. */
+
+.event-preview__count {
+  z-index: 35;
+  pointer-events: none;
+}
+
+.event-preview__item:hover,
+.event-preview__item:focus-visible,
+.event-layout-stack .event-preview__item:hover,
+.event-layout-stack .event-preview__item:focus-visible {
+  z-index: 120 !important;
+}
+
+.lightbox__location {
+  display: inline-flex;
+  align-items: center;
+  gap: .42rem;
+  line-height: 1.2;
+}
+
+.lightbox__location-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 1.05em;
+  width: 1.05em;
+  height: 1.05em;
+  line-height: 1;
+  transform: translateY(-.01em);
+}
+
+.lightbox__location-text {
+  min-width: 0;
+  line-height: 1.2;
+}

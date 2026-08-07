@@ -8,12 +8,17 @@ const base = process.env.PREVIEW_URL || "http://127.0.0.1:4173";
 await fs.rm(output, { recursive: true, force: true });
 await fs.mkdir(output, { recursive: true });
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, args: ["--autoplay-policy=no-user-gesture-required"] });
 
 async function settle(page) {
   await page.waitForLoadState("networkidle");
   await page.evaluate(async () => {
-    if (document.fonts?.ready) await document.fonts.ready;
+    if (document.fonts?.ready) {
+      await Promise.race([
+        document.fonts.ready,
+        new Promise((resolve) => window.setTimeout(resolve, 3000)),
+      ]);
+    }
     const images = [...document.images];
     images.forEach((image) => { image.loading = "eager"; });
     await Promise.all(images.map((image) => image.complete
@@ -38,6 +43,115 @@ await shot(desktop, "01-cover-desktop.png", { fullPage: false });
 
 await desktop.locator("#open-book").click();
 await desktop.waitForTimeout(450);
+
+const croppedPhoto = desktop.locator('[data-media-key="d02"] img').first();
+const croppedPhotoPosition = await croppedPhoto.evaluate((element) => getComputedStyle(element).objectPosition);
+if (!croppedPhotoPosition.includes("24%") || !croppedPhotoPosition.includes("72%")) {
+  throw new Error(`Saved photo crop was not applied: ${croppedPhotoPosition}`);
+}
+const selectedVideoPreview = desktop.locator('[data-media-key="d05"] video').first();
+await selectedVideoPreview.waitFor({ state: "attached" });
+await selectedVideoPreview.scrollIntoViewIfNeeded();
+await desktop.waitForTimeout(250);
+await selectedVideoPreview.evaluate(async (video, expected) => {
+  const sourceUrl = video.currentSrc || video.getAttribute("src") || video.src;
+  const configuredTime = Number(video.dataset.posterTime);
+  if (!sourceUrl) throw new Error("Selected-frame video has no source URL");
+  if (!Number.isFinite(configuredTime) || Math.abs(configuredTime - expected) > 0.001) {
+    throw new Error(`Runtime did not preserve posterTime: ${video.dataset.posterTime}`);
+  }
+
+  const waitUntil = async (predicate, timeout, message) => {
+    const deadline = performance.now() + timeout;
+    while (!predicate()) {
+      if (performance.now() >= deadline) throw new Error(message());
+      await new Promise((resolve) => window.setTimeout(resolve, 80));
+    }
+  };
+
+  let usedBlobFallback = false;
+  let responseStatus = null;
+  let sourceBytes = null;
+
+  try {
+    await waitUntil(
+      () => video.readyState >= 2 && Math.abs(video.currentTime - expected) <= 0.35,
+      3000,
+      () => "runtime preview frame was not decoded within the grace period"
+    );
+  } catch {
+    const response = await fetch(sourceUrl, { cache: "no-store" });
+    responseStatus = response.status;
+    if (!response.ok) {
+      throw new Error(`Selected-frame source request failed: ${response.status} ${sourceUrl}`);
+    }
+    const blob = await response.blob();
+    sourceBytes = blob.size;
+    if (!blob.size) throw new Error(`Selected-frame source is empty: ${sourceUrl}`);
+
+    const objectUrl = URL.createObjectURL(blob);
+    usedBlobFallback = true;
+    video.muted = true;
+    video.preload = "auto";
+    video.src = objectUrl;
+
+    await new Promise((resolve, reject) => {
+      const timer = window.setTimeout(
+        () => reject(new Error(`Timed out loading fetched video metadata: ${sourceUrl}`)),
+        10000
+      );
+      const done = () => {
+        window.clearTimeout(timer);
+        resolve();
+      };
+      const fail = () => {
+        window.clearTimeout(timer);
+        reject(new Error(`Fetched video could not be decoded: ${sourceUrl}`));
+      };
+      video.addEventListener("loadedmetadata", done, { once: true });
+      video.addEventListener("error", fail, { once: true });
+      try { video.load(); } catch (error) { fail(error); }
+    });
+
+    try { await video.play(); } catch {}
+    try { video.currentTime = expected; } catch (error) {
+      throw new Error(`Could not seek fetched video: ${error?.message || error}`);
+    }
+    await waitUntil(
+      () => video.readyState >= 2 && Math.abs(video.currentTime - expected) <= 0.35,
+      10000,
+      () => `Timed out decoding fetched selected frame ${expected}; current=${video.currentTime}; readyState=${video.readyState}`
+    );
+  }
+
+  video.pause();
+  if (video.readyState < 2 || Math.abs(video.currentTime - expected) > 0.35) {
+    throw new Error(`Selected frame mismatch after verification: current=${video.currentTime}; readyState=${video.readyState}`);
+  }
+  video.dataset.verificationSourceUrl = sourceUrl;
+  video.dataset.verificationBlobFallback = String(usedBlobFallback);
+  if (responseStatus !== null) video.dataset.verificationResponseStatus = String(responseStatus);
+  if (sourceBytes !== null) video.dataset.verificationSourceBytes = String(sourceBytes);
+}, 1.2);
+const selectedVideoState = await selectedVideoPreview.evaluate((video) => ({
+  currentTime: video.currentTime,
+  objectPosition: getComputedStyle(video).objectPosition,
+  paused: video.paused,
+  sourceUrl: video.dataset.verificationSourceUrl || video.currentSrc || video.src,
+  usedBlobFallback: video.dataset.verificationBlobFallback === "true",
+  responseStatus: Number(video.dataset.verificationResponseStatus || 0) || null,
+  sourceBytes: Number(video.dataset.verificationSourceBytes || 0) || null
+}));
+if (Math.abs(selectedVideoState.currentTime - 1.2) > .35) {
+  throw new Error(`Selected video frame was not sought: ${selectedVideoState.currentTime}`);
+}
+if (!selectedVideoState.objectPosition.includes("68%") || !selectedVideoState.objectPosition.includes("34%")) {
+  throw new Error(`Saved video crop was not applied: ${selectedVideoState.objectPosition}`);
+}
+if (!selectedVideoState.paused) {
+  throw new Error("Selected video preview frame is still playing");
+}
+
 await shot(desktop, "02-book-full-desktop.png", { fullPage: true });
 
 for (const [id, name] of [
@@ -58,54 +172,190 @@ await sharedAlbum.scrollIntoViewIfNeeded();
 await desktop.waitForTimeout(180);
 await sharedAlbum.screenshot({ path: path.join(output, "08-shared-album.png"), animations: "disabled" });
 
-const censoredFrame = desktop.locator(".image-frame.is-censored").first();
-await censoredFrame.scrollIntoViewIfNeeded();
-await censoredFrame.evaluate((element) => element.closest("button")?.click());
-await desktop.locator("#lightbox-censor").waitFor({ state: "visible" });
-await shot(desktop, "09-censorship-warning.png", { fullPage: false });
-await desktop.locator("#lightbox-censor-show").click();
-await desktop.waitForTimeout(120);
-await shot(desktop, "10-censorship-revealed.png", { fullPage: false });
-await desktop.locator("#lightbox-close").click();
+// Censorship checks run in their own page so sessionStorage and local reveal state cannot leak.
+const censorPage = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
+await censorPage.goto(`${base}/${previewQuery}`, { waitUntil: "networkidle" });
+await settle(censorPage);
+await censorPage.locator("#open-book").click();
+const censoredCover = censorPage.locator("#ordinary-days .censor-preview").first();
+await censoredCover.waitFor({ state: "visible" });
+await censoredCover.evaluate((element) => element.closest("button")?.click());
+await censorPage.locator("#lightbox-censor").waitFor({ state: "visible" });
+await shot(censorPage, "09-censorship-warning.png", { fullPage: false });
+await censorPage.locator("#lightbox-censor-show").click();
+await censorPage.waitForTimeout(120);
+await shot(censorPage, "10-censorship-revealed.png", { fullPage: false });
+await censorPage.locator("#lightbox-close").click();
+await censorPage.locator("#ordinary-days").scrollIntoViewIfNeeded();
+await censorPage.waitForTimeout(120);
+if (await censorPage.locator("#ordinary-days .censor-preview").count()) {
+  throw new Error("Locally revealed censored card became hidden again after closing the lightbox");
+}
+await shot(censorPage, "11-local-censorship-stays-revealed.png", { fullPage: false });
 
-const censorshipButton = desktop.locator(".reader-tools__button--censor");
+const censorshipButton = censorPage.locator(".reader-tools__button--censor");
 await censorshipButton.click();
-await desktop.waitForLoadState("networkidle");
-await desktop.locator("#open-book").click();
-await desktop.locator("#ordinary-days").scrollIntoViewIfNeeded();
-await desktop.waitForTimeout(250);
-await shot(desktop, "11-global-censorship-off.png", { fullPage: false });
+await censorPage.waitForLoadState("networkidle");
+await censorPage.locator("#open-book").click();
+await censorPage.locator("#ordinary-days").scrollIntoViewIfNeeded();
+await censorPage.waitForTimeout(250);
+await shot(censorPage, "12-global-censorship-off.png", { fullPage: false });
+await censorPage.close();
+
+// Regression for applying memories.js and reopening while the browser restores a deep scroll position.
+const chromeCheck = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
+await chromeCheck.goto(`${base}/${previewQuery}&opened=1#ordinary-days`, { waitUntil: "networkidle" });
+await chromeCheck.locator("#ordinary-days").scrollIntoViewIfNeeded();
+await chromeCheck.waitForTimeout(180);
+await chromeCheck.reload({ waitUntil: "networkidle" });
+await settle(chromeCheck);
+await chromeCheck.locator("#ordinary-days").scrollIntoViewIfNeeded();
+await chromeCheck.waitForTimeout(320);
+const readerChromeRestored = await chromeCheck.evaluate(() => {
+  const rail = document.querySelector("#chapter-rail");
+  const tools = document.querySelector(".reader-tools");
+  const railVisible = rail && getComputedStyle(rail).opacity !== "0";
+  const toolsVisible = tools && getComputedStyle(tools).opacity !== "0";
+  return document.body.classList.contains("book-opened") && Boolean(railVisible) && Boolean(toolsVisible);
+});
+if (!readerChromeRestored) throw new Error("Reader chrome was not restored after a deep reload");
+await shot(chromeCheck, "13-reader-chrome-after-deep-reload.png", { fullPage: false });
+await chromeCheck.close();
 
 const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
 await mobile.goto(`${base}/${previewQuery}`, { waitUntil: "networkidle" });
 await settle(mobile);
-await shot(mobile, "12-cover-mobile.png", { fullPage: false });
+await shot(mobile, "14-cover-mobile.png", { fullPage: false });
 await mobile.locator("#open-book").click();
 await mobile.locator("#ordinary-days").scrollIntoViewIfNeeded();
 await mobile.waitForTimeout(220);
-await shot(mobile, "13-event-mobile.png", { fullPage: false });
-const telegramMobile = mobile.locator("#telegram .memory-block--collage").first();
+await shot(mobile, "15-event-mobile.png", { fullPage: false });
+const telegramMobile = mobile.locator("#telegram .telegram-message").first();
 await telegramMobile.scrollIntoViewIfNeeded();
 await mobile.waitForTimeout(180);
-await telegramMobile.screenshot({ path: path.join(output, "14-telegram-mobile.png"), animations: "disabled" });
+await telegramMobile.screenshot({ path: path.join(output, "16-telegram-mobile.png"), animations: "disabled" });
 await mobile.locator("#shared-album").scrollIntoViewIfNeeded();
 await mobile.waitForTimeout(180);
-await shot(mobile, "15-shared-album-mobile.png", { fullPage: false });
+await shot(mobile, "17-shared-album-mobile.png", { fullPage: false });
 
 const studio = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
 await studio.goto(`${base}/tools/studio.html`, { waitUntil: "networkidle" });
 await settle(studio);
 const populatedChapter = studio.locator("details.chapter").nth(1);
 await populatedChapter.evaluate((element) => { element.open = true; });
-await studio.evaluate(() => {
-  document.querySelectorAll(".item-preview img").forEach((image) => {
-    const source = image.getAttribute("src");
-    if (source && !/^(?:https?:|data:|blob:|\/|\.\.\/)/.test(source)) image.setAttribute("src", `../${source}`);
-  });
-});
 await populatedChapter.scrollIntoViewIfNeeded();
 await studio.waitForTimeout(350);
-await shot(studio, "16-memory-studio.png", { fullPage: false });
+if (await studio.locator(".item-preview.is-missing").count()) {
+  throw new Error("Memory Studio contains broken photo or video previews");
+}
+await shot(studio, "18-memory-studio.png", { fullPage: false });
+const expandButton = populatedChapter.locator("[data-expand]").first();
+await expandButton.click();
+const expandedCard = populatedChapter.locator(".item.is-expanded").first();
+await expandedCard.scrollIntoViewIfNeeded();
+await studio.waitForTimeout(140);
+await shot(studio, "19-memory-studio-expanded-caption.png", { fullPage: false });
+
+const firstPhotoItem = populatedChapter.locator(".item").filter({ hasText: "PHOTO" }).first();
+await firstPhotoItem.locator(".item-preview").hover();
+await firstPhotoItem.locator("[data-crop]").click();
+await studio.locator("#crop-dialog").waitFor({ state: "visible" });
+await shot(studio, "20-studio-crop-editor.png", { fullPage: false });
+const cropStage = studio.locator("#crop-stage");
+const cropBox = await cropStage.boundingBox();
+if (!cropBox) throw new Error("Crop stage has no bounding box");
+await studio.mouse.move(cropBox.x + cropBox.width / 2, cropBox.y + cropBox.height / 2);
+await studio.mouse.down();
+await studio.mouse.move(cropBox.x + cropBox.width / 2 + 70, cropBox.y + cropBox.height / 2 - 45, { steps: 8 });
+await studio.mouse.up();
+const cropPositionText = await studio.locator("#crop-position").textContent();
+if (!cropPositionText || cropPositionText.includes("X 50% · Y 50%")) {
+  throw new Error("Dragging inside crop editor did not change crop position");
+}
+await studio.locator("#crop-save").click();
+await studio.locator("#crop-dialog").waitFor({ state: "hidden" });
+
+const videoItem = populatedChapter.locator(".item").filter({ hasText: "VIDEO" }).first();
+await videoItem.locator(".item-preview").hover();
+await videoItem.locator("[data-crop]").click();
+await studio.locator("#open-frame-picker").click();
+await studio.locator("#frame-view").waitFor({ state: "visible" });
+await studio.locator("#frame-video").evaluate((video) => new Promise((resolve) => {
+  if (video.readyState >= 1) resolve();
+  else video.addEventListener("loadedmetadata", resolve, { once: true });
+}));
+await studio.locator("#frame-range").evaluate((range) => {
+  range.value = "2.1";
+  range.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await studio.waitForTimeout(180);
+await shot(studio, "21-studio-video-frame-picker.png", { fullPage: false });
+await studio.locator("#frame-save").click();
+await studio.locator("#crop-view").waitFor({ state: "visible" });
+const cropVideo = studio.locator("#crop-stage video");
+await cropVideo.waitFor({ state: "attached" });
+await cropVideo.evaluate((video) => new Promise((resolve) => {
+  if (video.readyState >= 2 && Math.abs(video.currentTime - 2.1) < .4) resolve();
+  else {
+    video.addEventListener("seeked", resolve, { once: true });
+    window.setTimeout(resolve, 3000);
+  }
+}));
+const cropVideoTime = await cropVideo.evaluate((video) => video.currentTime);
+if (Math.abs(cropVideoTime - 2.1) > .4) {
+  throw new Error(`Saved frame did not return to crop editor: ${cropVideoTime}`);
+}
+await shot(studio, "22-studio-video-frame-in-polaroid.png", { fullPage: false });
+
+await studio.locator("#open-frame-picker").click();
+await studio.locator("#frame-video").evaluate((video) => new Promise((resolve) => {
+  if (video.readyState >= 1) resolve();
+  else video.addEventListener("loadedmetadata", resolve, { once: true });
+}));
+await studio.locator("#frame-range").evaluate((range) => {
+  range.value = "3.1";
+  range.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await studio.locator("#frame-cancel").click();
+await studio.locator("#open-frame-picker").click();
+await studio.locator("#frame-video").evaluate((video) => new Promise((resolve) => {
+  if (video.readyState >= 1) resolve();
+  else video.addEventListener("loadedmetadata", resolve, { once: true });
+}));
+const restoredFrameTime = await studio.locator("#frame-video").evaluate((video) => video.currentTime);
+if (Math.abs(restoredFrameTime - 2.1) > .4) {
+  throw new Error(`Frame picker cancel did not restore previous frame: ${restoredFrameTime}`);
+}
+await studio.locator("#frame-range").evaluate((range) => {
+  range.value = "2.6";
+  range.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await studio.locator("#frame-save-exit").click();
+await studio.locator("#crop-dialog").waitFor({ state: "hidden" });
+
+const exported = studio.waitForEvent("download");
+await studio.locator("#export").click();
+const download = await exported;
+const exportPath = path.join(output, "studio-export-test.js");
+await download.saveAs(exportPath);
+const exportedText = await fs.readFile(exportPath, "utf8");
+if (!exportedText.includes('"crop"') || !exportedText.includes('"posterTime": 2.6')) {
+  throw new Error("Studio export does not contain crop and selected video frame settings");
+}
+await fs.rm(exportPath, { force: true });
+
+const singleEvent = desktop.locator("#ordinary-days .memory-block--event").first();
+await singleEvent.scrollIntoViewIfNeeded();
+await desktop.waitForTimeout(120);
+await singleEvent.screenshot({ path: path.join(output, "23-single-row-event.png"), animations: "disabled" });
+const eightEvent = desktop.locator("#journeys .memory-block--event").first();
+await eightEvent.scrollIntoViewIfNeeded();
+await desktop.waitForTimeout(120);
+await eightEvent.screenshot({ path: path.join(output, "24-eight-item-event.png"), animations: "disabled" });
+const rightmostItem = eightEvent.locator(".event-preview__item--8");
+await rightmostItem.hover();
+await desktop.waitForTimeout(120);
+await eightEvent.screenshot({ path: path.join(output, "25-eight-item-hover-layer.png"), animations: "disabled" });
 
 await browser.close();
 
